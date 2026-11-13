@@ -187,40 +187,46 @@ def fetch_ring_current_by_facility(facility: str, cfg: dict) -> str:
     h, w, _ = img.shape
     text = ""
 
-    if facility == "PF":
-        ymin, ymax = int(h * 0.69), int(h * 0.76)
-        xmin, xmax = int(w * 0.23), int(w * 0.38)
-        roi = img[ymin:ymax, xmin:xmax]
-        r_channel = roi[:, :, 2]
-        resized = cv2.resize(r_channel, None, fx=3.0, fy=3.0, interpolation=cv2.INTER_CUBIC)
-        _, thresh = cv2.threshold(resized, 180, 255, cv2.THRESH_BINARY)
-        custom_config = r'--psm 7 -c tessedit_char_whitelist=0123456789.'
-        text = pytesseract.image_to_string(thresh, config=custom_config).strip()
+    try:
+        if facility == "PF":
+            ymin, ymax = int(h * 0.69), int(h * 0.76)
+            xmin, xmax = int(w * 0.23), int(w * 0.38)
+            roi = img[ymin:ymax, xmin:xmax]
+            r_channel = roi[:, :, 2]
+            resized = cv2.resize(r_channel, None, fx=3.0, fy=3.0, interpolation=cv2.INTER_CUBIC)
+            _, thresh = cv2.threshold(resized, 180, 255, cv2.THRESH_BINARY)
+            custom_config = r'--psm 7 -c tessedit_char_whitelist=0123456789.'
+            text = pytesseract.image_to_string(thresh, config=custom_config).strip()
 
-    elif facility == "SAGA-LS":
-        ymin, ymax = int(h * 0.05), int(h * 0.14)
-        xmin, xmax = int(w * 0.39), int(w * 0.57)
-        roi = img[ymin:ymax, xmin:xmax]
-        gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-        resized = cv2.resize(gray, None, fx=2.5, fy=2.5, interpolation=cv2.INTER_CUBIC)
-        _, thresh = cv2.threshold(resized, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
-        custom_config = r'--psm 7 -c tessedit_char_whitelist=0123456789.'
-        text = pytesseract.image_to_string(thresh, config=custom_config).strip()
+        elif facility == "SAGA-LS":
+            ymin, ymax = int(h * 0.05), int(h * 0.14)
+            xmin, xmax = int(w * 0.39), int(w * 0.57)
+            roi = img[ymin:ymax, xmin:xmax]
+            gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+            resized = cv2.resize(gray, None, fx=2.5, fy=2.5, interpolation=cv2.INTER_CUBIC)
+            _, thresh = cv2.threshold(resized, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+            custom_config = r'--psm 7 -c tessedit_char_whitelist=0123456789.'
+            text = pytesseract.image_to_string(thresh, config=custom_config).strip()
 
-    elif facility == "SPring-8":
-        ymin, ymax = int(h * 0.62), int(h * 0.69)
-        xmin, xmax = int(w * 0.005), int(w * 0.18)
-        roi = img[ymin:ymax, xmin:xmax]
-        gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-        resized = cv2.resize(gray, None, fx=2.5, fy=2.5, interpolation=cv2.INTER_CUBIC)
-        _, thresh = cv2.threshold(resized, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
-        custom_config = r'--psm 7 -c tessedit_char_whitelist=0123456789.'
-        text = pytesseract.image_to_string(thresh, config=custom_config).strip()
+        elif facility == "SPring-8":
+            ymin, ymax = int(h * 0.62), int(h * 0.69)
+            xmin, xmax = int(w * 0.005), int(w * 0.18)
+            roi = img[ymin:ymax, xmin:xmax]
+            gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+            resized = cv2.resize(gray, None, fx=2.5, fy=2.5, interpolation=cv2.INTER_CUBIC)
+            _, thresh = cv2.threshold(resized, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+            custom_config = r'--psm 7 -c tessedit_char_whitelist=0123456789.'
+            text = pytesseract.image_to_string(thresh, config=custom_config).strip()
+    except pytesseract.TesseractNotFoundError:
+        return "OCR未導入 (Tesseract)"
+    except Exception as e:
+        return f"OCRエラー: {str(e)}"
 
     match = re.search(r'\d+\.\d+|\d+', text)
     if match:
         return f"{float(match.group()):.2f} mA"
     return f"{text} mA" if text else "---.- mA"
+
 
 @router.get("/ring_current")
 def get_ring_current_api(account: str = None):
