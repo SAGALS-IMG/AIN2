@@ -68,21 +68,11 @@ rem 4. Install dependencies directly into ain2 environment
 echo --^> Installing dependencies.
 "%ENV_PYTHON%" -m pip install --upgrade pip
 "%ENV_PYTHON%" -m pip install fastapi "uvicorn[standard]" pydantic opencv-python-headless numpy requests python-multipart aiofiles pywebview pythonnet
-"%CONDA_EXE%" install -y -n ain2 --override-channels -c conda-forge xraylib tesseract
-rem 5. Generate launcher batch file and desktop shortcut
-set "RUN_BAT=%PROJECT_ROOT%\run_app.bat"
-echo @echo off > "%RUN_BAT%"
-echo cd /d "%PROJECT_ROOT%" >> "%RUN_BAT%"
-echo set "PATH=%ENV_DIR%;%ENV_DIR%\Library\bin;%ENV_DIR%\Scripts;%%PATH%%" >> "%RUN_BAT%"
-echo set "TESSDATA_PREFIX=%ENV_DIR%\share\tessdata" >> "%RUN_BAT%"
-echo "%ENV_PYTHON%" main.py >> "%RUN_BAT%"
-
 
 if exist "requirements.txt" (
     "%ENV_PYTHON%" -m pip install -r requirements.txt
 )
-"%CONDA_EXE%" install -y -n ain2 --override-channels -c conda-forge xraylib
-
+"%CONDA_EXE%" install -y -n ain2 --override-channels -c conda-forge xraylib tesseract
 
 if not exist "tmp_imagej" mkdir "tmp_imagej"
 if not exist "Log\default" mkdir "Log\default"
@@ -92,6 +82,7 @@ set "RUN_BAT=%PROJECT_ROOT%\run_app.bat"
 echo @echo off > "%RUN_BAT%"
 echo cd /d "%PROJECT_ROOT%" >> "%RUN_BAT%"
 echo set "PATH=%ENV_DIR%;%ENV_DIR%\Library\bin;%ENV_DIR%\Scripts;%%PATH%%" >> "%RUN_BAT%"
+echo set "TESSDATA_PREFIX=%ENV_DIR%\share\tessdata" >> "%RUN_BAT%"
 echo "%ENV_PYTHON%" main.py >> "%RUN_BAT%"
 
 set "DESKTOP_DIR=%USERPROFILE%\Desktop"
