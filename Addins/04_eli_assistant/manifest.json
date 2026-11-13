@@ -1,0 +1,16 @@
+{
+  "id": "eli_assistant",
+  "name": "AI実験パートナー Eli",
+  "name_en": "Eli - AI Assistant",
+  "version": "2.0.0",
+  "paid": false,
+  "icon_img": "eli3.png",
+  "tooltip_ja": "Eli (AI Assistant & RAG)",
+  "tooltip_en": "Eli (AI Assistant & RAG)",
+  "window": {
+    "type": "subwindow",
+    "entry": "window.html",
+    "width": 680,
+    "height": 760
+  }
+}

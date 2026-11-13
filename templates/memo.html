@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>✏️ Memo (memorandum)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/static/js/ain_i18n.js"></script>
+
+  <style>
+    /* 🌟 親ウィンドウ連動ダークモードスタイル */
+    body.dark-mode {
+      background-color: #1a1a1a !important;
+      color: #e0e0e0 !important;
+    }
+    body.dark-mode header,
+    body.dark-mode footer {
+      background-color: #2d2d2d !important;
+      border-color: #404040 !important;
+      color: #e0e0e0 !important;
+    }
+    body.dark-mode header button {
+      color: #e4e6eb !important;
+    }
+    body.dark-mode header button:hover {
+      background-color: #4e4f50 !important;
+    }
+    body.dark-mode header button.btn-active {
+      background-color: #3b82f6 !important;
+      color: #ffffff !important;
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4) !important;
+    }
+    body.dark-mode main {
+      background-color: #1e1e1e !important;
+    }
+    body.dark-mode #memoEditor {
+      color: #d4d4d4 !important;
+    }
+
+    /* 🌟 index.html と同等のトグルアクティブスタイル */
+    .btn-active {
+      background-color: #cbd5e1 !important; /* Tailwind slate-300 */
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25) !important;
+    }
+
+    /* 🌟 Tailwindで消されてしまう箇条書きの黒丸を復活 */
+    #memoEditor ul {
+      list-style-type: disc !important;
+      padding-left: 1.5rem !important;
+      margin: 0.5rem 0 !important;
+    }
+    #memoEditor ol {
+      list-style-type: decimal !important;
+      padding-left: 1.5rem !important;
+      margin: 0.5rem 0 !important;
+    }
+    #memoEditor li {
+      display: list-item !important;
+      margin-bottom: 0.25rem;
+    }
+  </style>
+</head>
+<body class="h-screen flex flex-col bg-[#eef4ee] font-sans select-none overflow-hidden text-gray-800">
+
+<!-- ツールバー (index.html と同一トーン) -->
+  <header class="h-8 bg-[#e6e6e6] border-b border-gray-300 flex items-center px-2 space-x-1 select-none text-xs">
+    <!-- アクション系（アイコン） -->
+    <button onclick="insertMemoTime()" title="現在日時を挿入" class="w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded text-gray-700 transition-colors">⏰</button>
+    <button onclick="insertMemoCheck()" title="チェックマーク挿入" class="w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded text-gray-700 transition-colors">✅</button>
+    <button id="btn_list" onmousedown="event.preventDefault()" onclick="execMemoFormat('insertUnorderedList')" title="箇条書きリスト" class="w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded text-gray-700 transition-colors">📄</button>
+    <!-- 履歴系 -->
+    <button onmousedown="event.preventDefault()" onclick="document.execCommand('undo')" title="元に戻す (⌘+Z)" class="w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded text-gray-700 ml-1 transition-colors">↩️</button>
+    <button onmousedown="event.preventDefault()" onclick="document.execCommand('redo')" title="やり直し (⌘+Shift+Z)" class="w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded text-gray-700 transition-colors">↪️</button>
+
+    <!-- セパレータ -->
+    <div class="h-4 w-px bg-gray-400 mx-1"></div>
+
+    <!-- トグル式テキスト装飾系 -->
+    <button id="btn_bold" onmousedown="event.preventDefault()" onclick="execMemoFormat('bold')" title="太字 (⌘+B)" class="w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded font-bold text-gray-700 transition-colors">B</button>
+    <button id="btn_italic" onmousedown="event.preventDefault()" onclick="execMemoFormat('italic')" title="斜体 (⌘+I)" class="w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded italic font-serif text-gray-700 transition-colors">I</button>
+    <button id="btn_underline" onmousedown="event.preventDefault()" onclick="execMemoFormat('underline')" title="下線 (⌘+U)" class="w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded underline text-gray-700 transition-colors">U</button>
+    <button id="btn_strike" onmousedown="event.preventDefault()" onclick="execMemoFormat('strikeThrough')" title="取り消し線" class="w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded line-through text-gray-700 transition-colors">S</button>
+    <button id="btn_color" onmousedown="event.preventDefault()" onclick="toggleMemoRedColor()" title="赤字切替" class="w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded font-bold text-red-600 transition-colors">A</button>
+
+    <div class="h-4 w-px bg-gray-400 mx-1"></div>
+
+    <!-- ★ ここから追加：箇条書きと番号リスト -->
+    <button onmousedown="event.preventDefault()" onclick="applyUnorderedList()" data-hint="箇条書きリスト (・)" class="w-6 h-6 flex items-center justify-center hover:bg-gray-200 rounded font-bold text-xs text-gray-700">☰</button>
+    <button onmousedown="event.preventDefault()" onclick="applyOrderedList()" data-hint="番号付きリスト (1. 2. 3.)" class="w-6 h-6 flex items-center justify-center hover:bg-gray-200 rounded font-bold text-xs text-gray-700">①</button>
+    <!-- ★ ここまで -->
+
+    <div class="flex-1"></div>
+    <span id="memoSaveStatus" class="text-[11px] text-gray-500">自動保存 (10s)</span>
+  </header>
+
+  <!-- メモ編集エリア -->
+  <main class="flex-1 p-3 overflow-y-auto">
+    <div id="memoEditor" contenteditable="true" 
+      class="w-full h-full min-h-[300px] outline-none text-gray-900 text-sm leading-relaxed" 
+      oninput="onMemoInput()"></div>
+  </main>
+
+  <!-- ステータスバー -->
+  <footer class="h-5 bg-gray-200 border-t border-gray-300 px-2 flex items-center text-[10px] text-gray-600">
+    <span id="memoStatusText">Ready</span>
+  </footer>
+
+  <script>
+    const API_BASE = `${window.location.origin}/api`;
+    let isMemoModified = false;
+
+    // ダークモード復元
+    if (localStorage.getItem('ailab_theme_dark') === 'true') {
+      document.body.classList.add('dark-mode');
+    }
+
+    // 初回ロード
+    window.onload = async () => {
+      try {
+        const cfgRes = await fetch(`${API_BASE}/config`);
+        const cfg = await cfgRes.json();
+        if (cfg.language && typeof setAppLanguage === 'function') {
+          setAppLanguage(cfg.language, false);
+        }
+      } catch (e) {}
+
+      try {
+        const res = await fetch(`${API_BASE}/memo`);
+        const data = await res.json();
+        const editor = document.getElementById('memoEditor');
+        editor.innerHTML = data.content_html || "";
+        
+        // 🌟 言語に応じたステータス表示
+        const isEn = (currentAppLanguage === "en");
+        document.getElementById('memoStatusText').textContent = data.exists 
+          ? (isEn ? "Loaded (backup created)" : "Loaded (.orig退避済)") 
+          : (isEn ? "New Memo" : "新規メモ");
+
+        editor.focus();
+        updateToolbarState();
+      } catch (e) {
+        document.getElementById('memoStatusText').textContent = (currentAppLanguage === "en") ? "Offline" : "オフライン";
+      }
+    };
+
+    // 編集検知
+    function onMemoInput() {
+      isMemoModified = true;
+      document.getElementById('memoSaveStatus').textContent = (currentAppLanguage === "en") ? "● Editing" : "● 編集中";
+      updateToolbarState();
+    }
+
+    // 保存処理
+    async function saveMemoContent() {
+      if (!isMemoModified) return;
+
+      const content = document.getElementById('memoEditor').innerHTML;
+      const isEn = (currentAppLanguage === "en");
+      try {
+        await fetch(`${API_BASE}/memo`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content_html: content })
+        });
+        isMemoModified = false;
+        document.getElementById('memoSaveStatus').textContent = isEn ? "Saved (.bak updated)" : "保存済 (.bak更新)";
+        document.getElementById('memoStatusText').textContent = "Saved";
+      } catch (e) {
+        document.getElementById('memoSaveStatus').textContent = isEn ? "Save Failed" : "保存失敗";
+      }
+    }
+
+    // 5秒インターバル保存
+    setInterval(async () => {
+      if (isMemoModified) {
+        await saveMemoContent();
+      }
+    }, 5000);
+
+    // ==========================================
+    // 🌟 書式トグル状態の監視 ＆ UI反映
+    // ==========================================
+    function updateToolbarState() {
+      const setBtnActive = (id, active) => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        if (active) {
+          btn.classList.add('btn-active');
+        } else {
+          btn.classList.remove('btn-active');
+        }
+      };
+
+      try {
+        setBtnActive('btn_bold', document.queryCommandState('bold'));
+        setBtnActive('btn_italic', document.queryCommandState('italic'));
+        setBtnActive('btn_underline', document.queryCommandState('underline'));
+        setBtnActive('btn_strike', document.queryCommandState('strikeThrough'));
+        setBtnActive('btn_list', document.queryCommandState('insertUnorderedList'));
+
+        // 赤色判定：foreColor の戻り値（rgb(239, 68, 68) や #ef4444 など）をチェック
+        const colorVal = document.queryCommandValue('foreColor') || '';
+        const isRed = colorVal.includes('239, 68, 68') || 
+                      colorVal.includes('255, 0, 0') || 
+                      colorVal.toLowerCase() === '#ef4444' || 
+                      colorVal.toLowerCase() === 'red';
+        setBtnActive('btn_color', isRed);
+      } catch (e) {
+        // フォーカスが外れている時などは無視
+      }
+    }
+
+    // キャレット移動・選択範囲変更のイベントを監視
+    document.addEventListener('selectionchange', () => {
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount) return;
+      const editor = document.getElementById('memoEditor');
+      if (editor.contains(sel.anchorNode)) {
+        updateToolbarState();
+      }
+    });
+
+    const memoEditor = document.getElementById('memoEditor');
+    memoEditor.addEventListener('keyup', updateToolbarState);
+    memoEditor.addEventListener('mouseup', updateToolbarState);
+
+    // ==========================================
+    // 装飾実行関数
+    // ==========================================
+    function execMemoFormat(command, value = null) {
+      memoEditor.focus();
+      document.execCommand(command, false, value);
+      onMemoInput();
+      updateToolbarState();
+    }
+
+    // 赤色トグル（すでに赤なら通常色に戻し、黒なら赤にする）
+    function toggleMemoRedColor() {
+      memoEditor.focus();
+      const colorVal = document.queryCommandValue('foreColor') || '';
+      const isRed = colorVal.includes('239, 68, 68') || 
+                    colorVal.includes('255, 0, 0') || 
+                    colorVal.toLowerCase() === '#ef4444' || 
+                    colorVal.toLowerCase() === 'red';
+      
+      if (isRed) {
+        document.execCommand('foreColor', false, '#1f2937'); // 通常テキスト色
+      } else {
+        document.execCommand('foreColor', false, '#ef4444'); // 赤色
+      }
+      onMemoInput();
+      updateToolbarState();
+    }
+
+    // 箇条書き（黒丸リスト）
+    function applyUnorderedList() {
+      document.execCommand('insertUnorderedList', false, null);
+      editor.focus();
+    }
+
+    // 番号付きリスト（1. 2. 3. ...）
+    function applyOrderedList() {
+      document.execCommand('insertOrderedList', false, null);
+      editor.focus();
+    }
+
+
+    // ウィンドウ位置・サイズの記憶
+    function saveWindowBounds() {
+      localStorage.setItem('memo_left', window.screenX);
+      localStorage.setItem('memo_top', window.screenY);
+      localStorage.setItem('memo_width', window.outerWidth);
+      localStorage.setItem('memo_height', window.outerHeight);
+    }
+
+    window.addEventListener('resize', saveWindowBounds);
+    window.addEventListener('beforeunload', saveWindowBounds);
+
+    // ウィンドウを閉じる直前の安全送信
+    window.addEventListener('pagehide', () => {
+      if (isMemoModified) {
+        const content = document.getElementById('memoEditor').innerHTML;
+        const blob = new Blob([JSON.stringify({ content_html: content })], { type: 'application/json' });
+        navigator.sendBeacon(`${API_BASE}/memo`, blob);
+      }
+    });
+  </script>
+</body>
+</html>

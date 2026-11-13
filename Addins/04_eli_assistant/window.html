@@ -1,0 +1,1519 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Eli - Experiment Assistant</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .hidden { display: none !important; }
+    body { user-select: none; }
+    textarea, input, #ai-chat-logs, .chat-bubble { 
+      user-select: text !important; 
+      -webkit-user-select: text !important; 
+    }
+    .chat-bubble-user {
+      background-color: #0d9488;
+      color: #ffffff;
+      padding: 8px 14px;
+      border-radius: 12px;
+      font-size: 13px;
+      line-height: 1.5;
+      max-width: 80%;
+      word-break: break-word;
+    }
+    .chat-bubble-bot {
+      background-color: #ffffff;
+      border: 1px solid #e5e7eb;
+      color: #1f2937;
+      padding: 8px 14px;
+      border-radius: 12px;
+      font-size: 13px;
+      line-height: 1.5;
+      max-width: 85%;
+      word-break: break-word;
+    }
+  </style>
+</head>
+<body class="h-screen flex flex-col bg-gray-100 font-sans text-xs text-gray-800 overflow-hidden relative">
+
+  <!-- ヘッダー -->
+  <header class="h-9 bg-[#4a5568] text-white px-3 flex items-center justify-between font-bold shadow-sm select-none shrink-0">
+    <div class="flex items-center space-x-2">
+      <img src="/api/addin/eli_assistant/icon" alt="Eli" class="w-7 h-7 object-contain select-none" onerror="this.src='/static/icon/eli3.png'">
+      <span class="text-sm">Eli（実験補佐 &amp; ナレッジ同期）</span>
+      <span id="ai-status-badge" class="ml-2 text-[10px] px-2 py-0.5 rounded font-normal bg-gray-600 text-gray-200">接続確認中...</span>
+    </div>
+    <div class="flex items-center space-x-2">
+      <span id="current-account-badge" class="text-[10px] bg-slate-700 px-2 py-0.5 rounded font-mono text-gray-300">account: default</span>
+      <button onclick="checkAIConnection()" title="再接続確認" class="text-gray-300 hover:text-white px-1">🔄</button>
+      <button onclick="toggleConfigPanel()" title="Eli 設定" class="w-6 h-6 flex items-center justify-center hover:bg-white/20 rounded transition-colors text-sm">⚙️</button>
+    </div>
+  </header>
+
+  <!-- タブ型ツールバー -->
+  <div class="flex border-b border-gray-300 bg-gray-200 px-3 pt-1.5 space-x-1 select-none shrink-0">
+    <button id="tabBtn_chat" onclick="switchTab('chat')" class="px-4 py-1.5 bg-white border-t border-l border-r border-gray-300 rounded-t font-bold text-gray-800 shadow-sm transition-colors">
+      💬 チャット
+    </button>
+    <button id="tabBtn_format" onclick="switchTab('format')" class="px-4 py-1.5 bg-gray-200 hover:bg-gray-100 border-b border-gray-300 rounded-t text-gray-600 transition-colors">
+      📝 Log整形
+    </button>
+    <button id="tabBtn_rag" onclick="switchTab('rag')" class="px-4 py-1.5 bg-gray-200 hover:bg-gray-100 border-b border-gray-300 rounded-t text-gray-600 transition-colors">
+      🧠 RAG生成
+    </button>
+  </div>
+
+  <!-- 接続エラーアラート -->
+  <div id="ai-connection-alert" class="hidden bg-rose-50 border-b border-rose-200 p-2 text-rose-700 flex items-center justify-between px-4 shrink-0">
+    <div class="flex items-center space-x-2">
+      <span class="text-base">⚠️</span>
+      <span class="font-bold">AI サーバーに接続できません:</span>
+      <span id="ai-connection-detail" class="text-[11px] font-mono text-rose-600"></span>
+    </div>
+    <button onclick="checkAIConnection()" class="px-2.5 py-0.5 bg-rose-100 hover:bg-rose-200 text-rose-800 rounded font-bold">再試行</button>
+  </div>
+
+  <!-- ================= タブ1: チャット ================= -->
+  <div id="tab_chat" class="flex-1 flex flex-col overflow-hidden">
+    <div class="bg-slate-100 border-b border-gray-300 px-3 py-1 flex items-center justify-between text-[11px] select-none shrink-0">
+      <div class="flex items-center space-x-1.5 truncate">
+        <span class="text-gray-500 font-bold">🤖 Model:</span>
+        <span class="eli-current-model-label font-mono font-bold text-teal-800 bg-teal-50 px-2 py-0.5 border border-teal-200 rounded truncate max-w-[280px]">
+          (読み込み中...)
+        </span>
+      </div>
+      
+      <div class="flex items-center space-x-2 bg-white px-2 py-0.5 border border-gray-300 rounded shadow-2xs">
+        <span class="text-gray-500 font-bold">モード:</span>
+        <label class="flex items-center space-x-1 cursor-pointer">
+          <input type="radio" name="chat_mode" value="multi" checked onchange="onChatModeChange(this.value)">
+          <span class="text-teal-800 font-bold">連続会話</span>
+        </label>
+        <label class="flex items-center space-x-1 cursor-pointer">
+          <input type="radio" name="chat_mode" value="single" onchange="onChatModeChange(this.value)">
+          <span class="text-gray-700">単発会話</span>
+        </label>
+      </div>
+    </div>
+
+    <div id="ai-chat-logs" class="flex-1 p-4 overflow-y-auto space-y-3 bg-[#f8fafc]">
+      <div class="flex items-start space-x-2 my-1.5">
+        <img src="/api/addin/eli_assistant/icon" alt="Eli" class="w-7 h-7 object-contain select-none" onerror="this.src='/static/icon/eli3.png'">
+        <div class="chat-bubble chat-bubble-bot shadow-sm select-text cursor-text">
+          <span id="eli-initial-greeting">準備はバッチリです！実験ノートの整理やデータの考察など、何でも聞いてくださいね。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 引用プレビュー -->
+    <div id="ai-quote-preview" class="hidden px-3 py-1.5 bg-amber-50 border-t border-amber-200 text-[11px] text-amber-900 truncate flex justify-between items-center shrink-0">
+      <div class="truncate"><span class="font-bold">引用中: </span><span id="ai-quote-text"></span></div>
+      <button onclick="clearQuote()" class="text-gray-400 hover:text-gray-600 font-bold ml-2">✕</button>
+    </div>
+
+    <!-- チャット入力欄 -->
+    <div class="p-3 bg-white border-t border-gray-300 flex flex-col space-y-2 shrink-0">
+      <textarea id="ai-input-message" rows="3" placeholder="Ask Eli... (Cmd+Enter to send, Enter for newline)"
+      class="w-full border border-gray-300 p-2 rounded bg-[#fdfdfd] text-xs outline-none resize-none font-sans leading-relaxed focus:border-teal-600 focus:bg-white"
+        onkeydown="handleAIChatKeyDown(event)"></textarea>
+      <div class="flex justify-between items-center select-none">
+        <span class="text-[11px] text-gray-400">Cmd+Enter または送信ボタン</span>
+        <div class="space-x-2">
+          <button onclick="clearAIChatLogs()" class="px-3 py-1 text-gray-600 hover:bg-gray-100 rounded border border-gray-300">クリア</button>
+          <button id="ai-send-btn" onclick="sendAIChatMessage()" class="px-4 py-1 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded shadow-sm">送信</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= タブ2: Log整形 ================= -->
+  <div id="tab_format" class="hidden flex-1 flex flex-col p-3 overflow-hidden bg-[#fafafa]">
+    <div class="flex items-center justify-between bg-white p-2 border border-gray-300 rounded shadow-sm shrink-0 mb-2">
+      <div class="flex items-center space-x-2">
+        <button onclick="openLogSelectDialog()" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded font-bold text-gray-700 flex items-center space-x-1.5 shadow-sm text-xs">
+          <span>📁</span><span>ログ選択...</span>
+        </button>
+        <span id="label_selected_logfile" class="text-xs font-mono font-bold text-teal-800 bg-teal-50 px-2 py-0.5 border border-teal-200 rounded">
+          未選択
+        </span>
+
+        <button id="btn_run_elog_format" onclick="runElogFormat()" class="ml-2 px-3.5 py-1 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded flex items-center space-x-1.5 shadow-sm">
+          <span>⚡</span><span>選択ログを整形</span>
+        </button>
+      </div>
+
+      <div class="flex items-center space-x-2">
+        <div class="flex items-center space-x-1 text-[11px] bg-teal-50 border border-teal-200 px-2 py-0.5 rounded font-mono font-bold text-teal-800">
+          <span>🤖</span>
+          <span class="eli-current-model-label">gemini-3.8-flash</span>
+        </div>
+        <button onclick="saveFormattedElog()" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded text-gray-700 font-bold flex items-center space-x-1 shadow-sm text-xs">
+          <span>💾</span><span>./eLog へ保存</span>
+        </button>
+      </div>
+    </div>
+
+    <div id="format_prompt_container" class="border border-gray-300 rounded p-2.5 bg-white flex flex-col shrink-0" style="height: 170px; min-height: 60px;">
+      <div class="flex justify-between items-center mb-1 shrink-0">
+        <label class="font-bold text-gray-700 text-[11px]">🪄 整形・抽出用プロンプト</label>
+        <button onclick="resetDefaultFormatPrompt()" class="text-[11px] text-teal-600 hover:underline">デフォルトに戻す</button>
+      </div>
+      <textarea id="elog_format_prompt" class="flex-1 w-full border border-gray-300 p-2 rounded bg-[#fdfbf7] text-[11px] font-mono leading-relaxed outline-none resize-none focus:border-teal-600"></textarea>
+    </div>
+
+    <div id="formatSplitter" class="h-2 w-full my-1 flex items-center justify-center cursor-row-resize hover:bg-teal-200 active:bg-teal-400 rounded transition-colors select-none shrink-0">
+      <div class="w-12 h-1 bg-gray-400 rounded-full"></div>
+    </div>
+
+    <div id="format_result_container" class="flex-1 flex flex-col border border-gray-300 rounded p-2.5 bg-white min-h-[100px] overflow-hidden">
+      <div class="flex justify-between items-center mb-1.5 shrink-0">
+        <div class="flex items-center space-x-2">
+          <select id="sel_elog_view_mode" onchange="onViewModeChange(this.value)" class="border border-gray-300 rounded px-2 py-0.5 text-xs font-bold outline-none bg-white text-gray-700 cursor-pointer shadow-sm">
+            <option value="none">ログ：未選択</option>
+            <option value="source" disabled>ログ：ソース</option>
+            <option value="stripped" disabled>ログ：画像除去</option>
+            <option value="formatted" disabled>ログ：Eli整形後</option>
+          </select>
+        </div>
+        <span id="elog_file_target" class="text-[10px] text-gray-400 font-mono">./eLog/default/YYYYMMDD_elog.md</span>
+      </div>
+
+      <div id="elog_html_viewer" class="flex-1 w-full border border-gray-300 p-3 rounded bg-white overflow-y-auto select-text text-gray-900 leading-relaxed">
+        <span class="text-gray-400 text-xs">ログファイルを選択すると、ここに内容が表示されます。</span>
+      </div>
+
+      <textarea id="elog_formatted_text" placeholder="ここにEliが構造化したMarkdownが表示されます。外部AI（エマ）の整形結果を貼り付けて保存することも可能です。"
+        class="hidden flex-1 w-full border border-gray-300 p-2.5 rounded bg-white text-xs font-mono leading-relaxed outline-none resize-none text-gray-800 focus:border-teal-600"></textarea>
+    </div>
+  </div>
+
+  <!-- ================= タブ3: RAG生成 ================= -->
+  <div id="tab_rag" class="hidden flex-1 p-4 space-y-3 bg-[#fafafa] overflow-y-auto">
+    <div class="border border-purple-200 bg-purple-50/50 p-4 rounded-lg shadow-sm">
+      <div class="flex items-center justify-between mb-2">
+        <span class="font-bold text-sm text-purple-900 flex items-center gap-1.5">
+          <span>📚</span> ローカル実験ログ・RAGインデックス
+        </span>
+        <div class="flex items-center space-x-2">
+          <span id="eli-rag-doc-count" class="text-xs bg-purple-200 text-purple-800 px-2 py-0.5 rounded font-mono font-bold">
+            確認中...
+          </span>
+          <button onclick="fetchEliRagStatus()" title="状態を再取得" class="text-xs text-purple-700 hover:text-purple-900 px-1.5 py-0.5 border border-purple-300 rounded bg-white shadow-2xs">
+            🔄 <span id="lbl-btn-rag-check">状態確認</span>
+          </button>
+        </div>
+      </div>
+
+      <p id="lbl-rag-desc" class="text-xs text-gray-600 leading-relaxed mb-3">
+        現在のアカウント（<b id="eli-rag-target-account" class="font-mono text-gray-700"></b>）の <code>elog/</code> を元に、MacローカルのChromaDBへ知識ベースを構築・更新します。
+      </p>
+
+      <div class="flex items-center justify-end space-x-2 pt-3 border-t border-purple-200">
+        <button onclick="runRagSyncDiff()" id="btn-eli-rag-sync" class="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded text-xs font-bold shadow-sm transition-colors flex items-center gap-1">
+          <span>➕</span> 新規elogを差分追加
+        </button>
+        <button onclick="runRagRebuildAll()" id="btn-eli-rag-rebuild" class="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded text-xs font-bold shadow-sm transition-colors flex items-center gap-1">
+          <span>⚠️</span> 全再構築 (クリーン)
+        </button>
+      </div>
+    </div>
+
+    <div class="border border-gray-200 bg-white p-3 rounded-lg shadow-2xs flex-1 flex flex-col min-h-[220px]">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-[11px] font-bold text-gray-700 flex items-center gap-1">
+          <span>📋</span> 登録状況モニター
+        </span>
+        <span id="eli-rag-files-badge" class="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-mono">0 files</span>
+      </div>
+
+      <div class="text-[11px] font-mono text-gray-600 mb-2.5 pb-2 border-b border-gray-100 space-y-0.5">
+        <div>・対象アカウント: <b id="eli-rag-monitor-account" class="text-teal-700">default</b></div>
+          <div>・登録済みelog件数: <b id="eli-rag-monitor-count" class="text-purple-700">0</b> <span id="lbl-rag-mon-unit">件</span></div>
+      </div>
+
+      <div class="text-[11px] font-bold text-gray-500 mb-1">登録ファイル一覧:</div>
+      <div id="eli-rag-file-chips" class="flex-1 overflow-y-auto max-h-[260px] p-2 bg-[#f8fafc] border border-gray-200 rounded flex flex-wrap gap-1.5 content-start">
+        <span class="text-gray-400 text-xs">（登録ファイルなし）</span>
+      </div>
+    </div>
+
+    <div id="eli-rag-status-msg" class="text-xs text-gray-600 min-h-[20px] px-1 font-mono"></div>
+  </div>
+
+  <!-- ⚙️ Eli 設定パネル (スライド・オーバーレイ) -->
+  <div id="panelEliConfig" class="hidden absolute inset-0 bg-[#f4f4f5] p-4 flex flex-col space-y-2.5 z-30 overflow-y-auto">
+    <div class="flex justify-between items-center border-b border-gray-300 pb-2 select-none">
+      <div class="flex items-center space-x-1.5">
+        <span class="text-base">⚙️</span>
+        <span class="font-bold text-sm text-gray-800">Eli (AI) 環境設定</span>
+      </div>
+      <button onclick="toggleConfigPanel()" class="text-gray-400 hover:text-gray-600 font-bold text-base px-1">✕</button>
+    </div>
+
+    <div>
+      <div class="flex justify-between items-center mb-0.5 select-none">
+        <label class="font-bold text-gray-700 text-[11px]">URL</label>
+        <div class="flex items-center space-x-1">
+          <span class="text-[10px] text-gray-500">履歴:</span>
+          <select id="sel_ai_url_history" onchange="onSelectUrlHistory(this.value)" class="h-5 border border-gray-300 bg-white rounded px-1 text-[10px] outline-none max-w-[200px]">
+            <option value="">(履歴から選択)</option>
+          </select>
+        </div>
+      </div>
+      <input id="opt_ai_url" type="text" class="w-full h-7 border border-gray-300 px-2 rounded bg-white text-xs font-mono outline-none focus:border-teal-600">
+    </div>
+
+    <div>
+      <label class="block font-bold mb-0.5 text-gray-700 text-[11px] select-none">API Key (Cloud LLM用)</label>
+      <input id="opt_ai_api_key" type="password" placeholder="AIzaSy... (ローカルLLMは空欄)" class="w-full h-7 border border-gray-300 px-2 rounded bg-white text-xs font-mono outline-none focus:border-teal-600">
+    </div>
+
+    <div class="grid grid-cols-2 gap-2 items-end">
+      <div>
+        <label class="block font-bold text-gray-700 mb-0.5 text-[11px] select-none">Server type</label>
+        <select id="opt_ai_server" class="w-full h-7 border border-gray-300 px-1 rounded bg-white text-xs outline-none">
+          <option value="vLLM (OpenAI)">vLLM (OpenAI)</option>
+          <option value="Ollama">Ollama</option>
+        </select>
+      </div>
+      <div>
+        <div class="flex justify-between items-center mb-0.5 select-none">
+          <label class="font-bold text-gray-700 text-[11px]">Model</label>
+          <div class="flex items-center space-x-1">
+            <button type="button" onclick="fetchModelsFromAI()" class="text-[9px] px-1.5 py-0.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold leading-none">取得</button>
+            <select id="opt_ai_model_select" onchange="onSelectModelPreset(this.value)" class="h-5 border border-gray-300 bg-white rounded text-[10px] outline-none max-w-[100px]">
+              <option value="">(候補)</option>
+            </select>
+          </div>
+        </div>
+        <input id="opt_ai_model" type="text" placeholder="gemini-3.8-flash" class="w-full h-7 border border-gray-300 px-2 rounded bg-white text-xs font-mono outline-none focus:border-teal-600">
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-2 select-none">
+      <div>
+        <label class="block font-bold mb-0.5 text-gray-700 text-[11px]">Temperature</label>
+        <input id="opt_ai_temp" type="text" value="0.7" class="w-full h-7 border border-gray-300 px-2 rounded bg-white text-xs outline-none">
+      </div>
+      <div>
+        <label class="block font-bold mb-0.5 text-gray-700 text-[11px]">AI応答タイムアウト (秒)</label>
+        <input id="opt_ai_timeout" type="number" min="10" max="600" step="10" value="180" class="w-full h-7 border border-gray-300 px-2 rounded bg-white text-xs outline-none">
+      </div>
+    </div>
+
+    <div class="flex-1 flex flex-col min-h-[90px]">
+      <label class="block font-bold mb-0.5 text-gray-700 text-[11px] select-none">System Prompt</label>
+      <textarea id="opt_ai_prompt" class="flex-1 w-full border border-gray-300 p-2 rounded bg-[#fdfbf7] text-xs font-mono outline-none resize-none leading-relaxed focus:border-teal-600"></textarea>
+    </div>
+
+    <div class="pt-2 border-t border-gray-300 flex justify-end space-x-2 shrink-0 select-none">
+      <button onclick="toggleConfigPanel()" class="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded text-xs font-medium">キャンセル</button>
+      <button onclick="saveEliConfigModal()" class="px-4 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded text-xs font-bold shadow-sm">設定を保存</button>
+    </div>
+  </div>
+
+  <!-- 📁 ログ選択ダイアログ -->
+  <div id="modalLogSelect" class="hidden fixed inset-0 bg-black/45 z-50 flex items-center justify-center select-none backdrop-blur-[1px]">
+    <div class="bg-[#f0f0f0] border border-gray-400 shadow-2xl rounded-lg w-[580px] h-[520px] flex flex-col overflow-hidden text-xs">
+      <div class="h-7 bg-gray-200 border-b border-gray-300 flex items-center justify-between px-3 font-bold text-gray-700 select-none">
+        <div class="flex items-center space-x-1.5">
+          <span>📁</span><span>Open Log File (ログ選択)</span>
+        </div>
+        <button onclick="closeLogSelectDialog()" class="text-gray-400 hover:text-gray-600 font-bold">✕</button>
+      </div>
+
+      <div class="h-[190px] border-b border-gray-300 bg-white overflow-y-auto">
+        <table class="w-full text-left border-collapse font-mono">
+          <thead class="bg-gray-100 sticky top-0 border-b border-gray-200 text-gray-600 text-[11px]">
+            <tr>
+              <th class="py-1 px-3 w-32 border-r border-gray-200">ファイル名</th>
+              <th class="py-1 px-3 w-28 border-r border-gray-200">日付</th>
+              <th class="py-1 px-3">状態</th>
+            </tr>
+          </thead>
+          <tbody id="logFileListBody" class="divide-y divide-gray-100 text-gray-700 cursor-pointer text-[11px]"></tbody>
+        </table>
+      </div>
+
+      <div class="flex-1 flex flex-col p-2 bg-[#eaeaea] overflow-hidden">
+        <div class="flex justify-between items-center mb-1 px-1">
+          <span class="font-bold text-gray-600 text-[11px]">📝 ログ内容プレビュー（テキスト抽出）</span>
+          <span id="preview_log_name" class="font-mono text-[10px] text-gray-500">未選択</span>
+        </div>
+        <div id="preview_log_text" class="flex-1 bg-white border border-gray-300 p-2.5 rounded font-mono text-[11px] leading-relaxed text-gray-800 overflow-y-auto whitespace-pre-wrap select-text">
+          （上の一覧からファイルを選択してください）
+        </div>
+      </div>
+
+      <div class="h-10 bg-gray-200 border-t border-gray-300 px-3 flex items-center justify-between">
+        <span id="log_dialog_status" class="text-[11px] text-gray-500">ログを選択してください</span>
+        <div class="space-x-2">
+          <button onclick="closeLogSelectDialog()" class="px-3 py-1 bg-gray-300 hover:bg-gray-400 border border-gray-400 rounded text-gray-700 font-bold">
+            キャンセル
+          </button>
+          <button id="btn_confirm_select_log" onclick="confirmSelectedLog()" disabled class="px-4 py-1 bg-teal-600 hover:bg-teal-700 disabled:bg-gray-400 text-white font-bold rounded shadow-sm">
+            OK (選択)
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 最下部ステータスバー -->
+  <footer id="EliStatusBar" class="h-6 bg-[#4a5568] text-white text-[11px] flex items-center px-3 border-t border-gray-400 justify-between select-none shrink-0">
+    <div class="flex items-center space-x-2">
+      <span id="eliStatusDot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+      <span id="eliStatusText">Ready</span>
+    </div>
+    <div class="flex items-center space-x-3 font-mono text-[11px]">
+      <span id="eliTimerText" class="text-gray-300">⏱ 0.0s</span>
+    </div>
+  </footer>
+
+  <script>
+    const API_ADDIN = `${window.location.origin}/api/addin/eli_assistant`;
+    const API_BASE = `${window.location.origin}/api`;
+
+    let currentAccount = "default";
+    let activeDateStr = "";
+    let selectedQuoteText = "";
+    let formatTimerId = null;
+
+    let chatConversationHistory = [];
+    let isMultiTurnMode = true;
+    function onChatModeChange(mode) {
+      isMultiTurnMode = (mode === "multi");
+      if (!isMultiTurnMode) {
+        chatConversationHistory = [];
+      }
+    }
+
+    let localPromptHeight = 170;
+    let rawSourceHtmlContent = "";
+    let strippedHtmlContent = "";
+    let strippedPlainText = "";
+    let currentFormattedMarkdown = "";
+
+    const DEFAULT_ELOG_PROMPT = 
+`あなたは実験ログの構造化アシスタントです。
+以下のHTMLログからノイズ（base64画像バイナリ、無駄なタグ）を除去し、
+Frontmatter（日付、施設、BL、Energy、手法）と、
+【実験条件】【測定手順・操作ログ】【考察・ToDo】のMarkdownセクションに構造化・要約してください。`;
+
+    function applyPromptHeight(h) {
+      if (!h || h < 60) h = 170;
+      localPromptHeight = h;
+      const promptBox = document.getElementById('format_prompt_container');
+      if (promptBox) {
+        promptBox.style.setProperty('height', `${h}px`, 'important');
+        promptBox.style.setProperty('flex', `0 0 ${h}px`, 'important');
+      }
+    }
+
+    function switchTab(tabName) {
+      ['chat', 'format', 'rag'].forEach(t => {
+        const pane = document.getElementById(`tab_${t}`);
+        const btn = document.getElementById(`tabBtn_${t}`);
+        if (pane) pane.classList.add('hidden');
+        if (btn) btn.className = "px-4 py-1.5 bg-gray-200 hover:bg-gray-100 border-b border-gray-300 rounded-t text-gray-600 transition-colors";
+      });
+
+      const activePane = document.getElementById(`tab_${tabName}`);
+      const activeBtn = document.getElementById(`tabBtn_${tabName}`);
+      if (activePane) activePane.classList.remove('hidden');
+      if (activeBtn) activeBtn.className = "px-4 py-1.5 bg-white border-t border-l border-r border-gray-300 rounded-t font-bold text-gray-800 shadow-sm transition-colors";
+
+      if (tabName === 'format') {
+        setTimeout(() => { applyPromptHeight(localPromptHeight); }, 10);
+      } else if (tabName === 'rag') {
+        fetchEliRagStatus();
+      }
+    }
+
+    // ==========================================
+    // ⚙️ 設定パネル制御
+    // ==========================================
+    let currentUrlHistory = [];
+
+    async function toggleConfigPanel() {
+      const panel = document.getElementById('panelEliConfig');
+      panel.classList.toggle('hidden');
+      if (!panel.classList.contains('hidden')) {
+        await loadConfigIntoPanel();
+      }
+    }
+
+    async function loadConfigIntoPanel() {
+      try {
+        const res = await fetch(`${API_ADDIN}/config?account=${encodeURIComponent(currentAccount)}`);
+        const data = await res.json();
+        const cfg = data.config || {};
+
+        document.getElementById('opt_ai_url').value = cfg.ai_url || '';
+        document.getElementById('opt_ai_api_key').value = cfg.ai_api_key || '';
+        document.getElementById('opt_ai_server').value = cfg.ai_server_type || 'vLLM (OpenAI)';
+        document.getElementById('opt_ai_model').value = cfg.ai_model || 'gemini-3.8-flash';
+        document.getElementById('opt_ai_temp').value = cfg.ai_temp || '0.7';
+        document.getElementById('opt_ai_timeout').value = cfg.ai_timeout || 180;
+        document.getElementById('opt_ai_prompt').value = cfg.ai_system_prompt || '';
+
+        currentUrlHistory = Array.isArray(cfg.ai_url_history) ? cfg.ai_url_history : [
+          "https://generativelanguage.googleapis.com/v1beta/openai",
+          "http://localhost:8001"
+        ];
+        renderUrlHistorySelect();
+
+        const modelSel = document.getElementById('opt_ai_model_select');
+        modelSel.innerHTML = `
+          <option value="">(候補)</option>
+          <option value="gemini-3.8-flash">gemini-3.8-flash</option>
+          <option value="mistralai/Mistral-Small-24B-Instruct-2501">Mistral-Small-24B</option>
+        `;
+      } catch (e) {
+        console.error("Eli設定取得失敗", e);
+      }
+    }
+
+    function renderUrlHistorySelect() {
+      const sel = document.getElementById('sel_ai_url_history');
+      sel.innerHTML = '<option value="">(履歴から選択)</option>';
+      currentUrlHistory.forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u;
+        opt.textContent = u;
+        sel.appendChild(opt);
+      });
+    }
+
+    function onSelectUrlHistory(val) {
+      if (val) document.getElementById('opt_ai_url').value = val;
+    }
+
+    function onSelectModelPreset(val) {
+      if (val) document.getElementById('opt_ai_model').value = val;
+    }
+
+    async function fetchModelsFromAI() {
+      const url = document.getElementById('opt_ai_url').value.trim();
+      const isVllm = (document.getElementById('opt_ai_server').value === 'vLLM (OpenAI)');
+      const apiKey = document.getElementById('opt_ai_api_key').value.trim();
+      const modelInput = document.getElementById('opt_ai_model');
+
+      try {
+        const res = await fetch(`${API_ADDIN}/ai/models`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: url, is_vllm: isVllm, api_key: apiKey })
+        });
+        const data = await res.json();
+        const models = data.models || [];
+        if (models.length > 0) {
+          const sel = document.getElementById('opt_ai_model_select');
+          sel.innerHTML = '<option value="">(取得一覧から選択)</option>';
+          models.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m;
+            opt.textContent = m;
+            sel.appendChild(opt);
+          });
+          modelInput.value = models[0];
+          alert(`${models.length} 件のモデルを取得しました。`);
+        } else {
+          alert("モデルを取得できませんでした。");
+        }
+      } catch (err) {
+        alert("モデル取得エラー: " + err.message);
+      }
+    }
+
+    async function saveEliConfigModal() {
+      const newUrl = document.getElementById('opt_ai_url').value.trim();
+      if (newUrl && !currentUrlHistory.includes(newUrl)) {
+        currentUrlHistory.unshift(newUrl);
+      }
+
+      const cfg = {
+        account: currentAccount,
+        ai_url: newUrl,
+        ai_url_history: currentUrlHistory,
+        ai_api_key: document.getElementById('opt_ai_api_key').value.trim(),
+        ai_server_type: document.getElementById('opt_ai_server').value,
+        ai_model: document.getElementById('opt_ai_model').value.trim(),
+        ai_temp: document.getElementById('opt_ai_temp').value.trim(),
+        ai_timeout: parseFloat(document.getElementById('opt_ai_timeout').value) || 180,
+        ai_system_prompt: document.getElementById('opt_ai_prompt').value
+      };
+
+      try {
+        const res = await fetch(`${API_ADDIN}/config`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(cfg)
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        document.querySelectorAll('.eli-current-model-label').forEach(el => {
+          el.textContent = cfg.ai_model || "未設定";
+        });
+
+        alert("Eliの設定を保存しました。");
+        toggleConfigPanel();
+        checkAIConnection();
+      } catch (e) {
+        alert("設定保存失敗: " + e.message);
+      }
+    }
+
+    // ==========================================
+    // 初期化 (安全に段階実行)
+    // ==========================================
+
+let currentLang = 'ja';
+
+    const ELI_I18N_MAP = {
+      // ヘッダー・タブ
+      "Eli（実験補佐 & ナレッジ同期）": "Eli (AI Assistant & Knowledge Sync)",
+      "🟢 オンライン": "🟢 Online",
+      "🔴 オフライン": "🔴 Offline",
+      "接続確認中...": "Connecting...",
+      "確認中...": "Checking...",
+      "再接続確認": "Check Connection",
+      "Eli 設定": "Eli Settings",
+      "💬 チャット": "💬 Chat",
+      "📝 Log整形": "📝 Log Format",
+      "🧠 RAG生成": "🧠 RAG Index",
+
+      // チャットタブ
+      "モード:": "Mode:",
+      "連続会話": "Multi-turn",
+      "単発会話": "Single-turn",
+      "クリア": "Clear",
+      "送信": "Send",
+      "Cmd+Enter または送信ボタン": "Cmd+Enter or Send button",
+
+      // Log整形タブ
+      "ログ選択...": "Select Log...",
+      "選択ログを整形": "Format Log",
+      "./eLog へ保存": "Save to ./eLog",
+      "未選択": "None",
+      "デフォルトに戻す": "Reset to Default",
+      "ログ：未選択": "Log: None",
+      "ログ：ソース": "Log: Source HTML",
+      "ログ：画像除去": "Log: Stripped",
+      "ログ：Eli整形後": "Log: Formatted",
+      "ログ：未整形": "Log: Unformatted",
+
+      // RAG生成タブ
+      "ローカル実験ログ・RAGインデックス": "Local Experiment RAG Index",
+      "状態確認": "Check Status",
+      "新規elogを差分追加": "Add New eLog (Diff)",
+      "全再構築 (クリーン)": "Clean Rebuild All",
+      "登録状況モニター": "Index Monitor",
+      "・対象アカウント:": "・Target Account:",
+      "・登録済みelog件数:": "・Indexed Logs:",
+      "登録ファイル一覧:": "Indexed Files:",
+
+      // Eli 設定パネル
+      "履歴:": "History:",
+      "(履歴から選択)": "(Select from History)",
+      "API Key (Cloud LLM用)": "API Key (for Cloud LLM)",
+      "Server type": "Server Type",
+      "取得": "Fetch",
+      "(候補)": "(Candidates)",
+      "System Prompt": "System Prompt",
+      "キャンセル": "Cancel",
+      "設定を保存": "Save Settings"
+    };
+
+    const ELI_REVERSE_MAP = {};
+    Object.entries(ELI_I18N_MAP).forEach(([ja, en]) => {
+      ELI_REVERSE_MAP[en] = ja;
+    });
+
+    function applyEliLang(lang) {
+      currentLang = (lang === 'en') ? 'en' : 'ja';
+      const isEn = (currentLang === 'en');
+      const dict = isEn ? ELI_I18N_MAP : ELI_REVERSE_MAP;
+
+      // 1. OSタイトルバーの同期
+      const winTitle = isEn ? "AIN - Eli (AI Assistant)" : "AIN - Eli（実験補佐）";
+      document.title = winTitle;
+      fetch('/api/set_window_title', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ win_key: 'window_addin_eli_assistant', title: winTitle })
+      }).catch(() => {});
+
+      // 2. title属性の置換
+      document.querySelectorAll('[title]').forEach(el => {
+        const t = el.getAttribute('title');
+        if (t && dict[t]) el.setAttribute('title', dict[t]);
+      });
+
+      // 3. DOM内テキストノードの置換
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+      let node;
+      while ((node = walker.nextNode())) {
+        const tag = node.parentElement ? node.parentElement.tagName.toLowerCase() : "";
+        if (tag === "script" || tag === "style" || tag === "textarea") continue;
+        const trimmed = node.nodeValue.trim();
+        if (dict[trimmed]) {
+          node.nodeValue = node.nodeValue.replace(trimmed, dict[trimmed]);
+        }
+      }
+
+      // 4. 動的要素・説明文の同期
+      const input = document.getElementById('ai-input-message');
+      if (input) {
+        input.placeholder = isEn
+          ? "Ask Eli... (Cmd+Enter to send, Enter for newline)"
+          : "Eliに質問や相談を入力... (Cmd+Enterで送信、Enterで改行)";
+      }
+      const sendBtn = document.getElementById('ai-send-btn');
+      if (sendBtn && !sendBtn.disabled) {
+        sendBtn.textContent = isEn ? "Send" : "送信";
+      }
+      const ragDesc = document.getElementById('lbl-rag-desc');
+      if (ragDesc) {
+        ragDesc.innerHTML = isEn
+          ? `Build and update local knowledge base in ChromaDB based on <code>elog/</code> of the current account (<b id="eli-rag-target-account" class="font-mono text-gray-700">${escapeHtml(currentAccount)}</b>).`
+          : `現在のアカウント（<b id="eli-rag-target-account" class="font-mono text-gray-700">${escapeHtml(currentAccount)}</b>）の <code>elog/</code> を元に、MacローカルのChromaDBへ知識ベースを構築・更新します。`;
+      }
+      const monUnit = document.getElementById('lbl-rag-mon-unit');
+      if (monUnit) monUnit.textContent = isEn ? "files" : "件";
+    }
+
+
+    async function initEliWindow() {
+      // 1. 基本設定（アカウントと言語）の取得
+      try {
+        const cfgRes = await fetch(`${API_BASE}/config`);
+        const baseCfg = await cfgRes.json();
+        currentAccount = baseCfg.account_name || baseCfg.current_account || "default";
+        currentLang = baseCfg.language || 'ja';
+
+        applyEliLang(currentLang);
+
+        document.getElementById('current-account-badge').textContent = `account: ${currentAccount}`;
+        const targetAccEl = document.getElementById('eli-rag-target-account');
+        if (targetAccEl) targetAccEl.textContent = currentAccount;
+      } catch (e) {
+        console.warn("Base config failed", e);
+        applyEliLang('ja');
+      }
+
+      // 2. Eli個別設定（モデル名や整形プロンプト）の取得
+      try {
+        const eliRes = await fetch(`${API_ADDIN}/config?account=${encodeURIComponent(currentAccount)}`);
+        const eliData = await eliRes.json();
+        const eliCfg = eliData.config || {};
+
+        const modelName = eliCfg.ai_model || "gemini-3.8-flash";
+        document.querySelectorAll('.eli-current-model-label').forEach(el => {
+          el.textContent = modelName;
+        });
+
+        if (eliCfg.elog_format_prompt) {
+          document.getElementById('elog_format_prompt').value = eliCfg.elog_format_prompt;
+        } else {
+          document.getElementById('elog_format_prompt').value = DEFAULT_ELOG_PROMPT;
+        }
+      } catch (e) {
+        console.warn("Eli config fetch failed", e);
+      }
+
+      // 3. 初期挨拶文と言語に合わせた表示更新
+      const greetingElem = document.getElementById('eli-initial-greeting');
+      if (greetingElem) {
+        greetingElem.textContent = (currentLang === 'en')
+          ? `Hello ${currentAccount}-san! Ready to assist with your experiment notes and data analysis.`
+          : `${currentAccount}さん、準備はバッチリです！実験ノートの整理やデータの考察など、何でも聞いてくださいね。`;
+      }
+
+      // 4. 対象日付の復元
+      const savedDStr = localStorage.getItem('ain2_last_date') || localStorage.getItem('ailab_last_date');
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const d = String(now.getDate()).padStart(2, '0');
+      activeDateStr = (savedDStr && savedDStr.length === 8) ? savedDStr : `${y}${m}${d}`;
+
+      document.getElementById('label_selected_logfile').textContent = `${activeDateStr}.html`;
+      document.getElementById('elog_file_target').textContent = `./eLog/${currentAccount}/${activeDateStr}_elog.md`;
+
+      // 5. AIサーバー接続確認とRAG状態取得
+      checkAIConnection();
+      fetchEliRagStatus();
+
+      // 6. 本体エディタで選択中のテキストがあれば汎用ブリッジ経由で引用取得
+      if (typeof addinBridge !== 'undefined') {
+        addinBridge.postMessage({ action: 'request_selection' });
+      }
+    }
+
+    // DOMContentLoaded がすでに発火している場合も即時実行するガード
+    if (document.readyState === 'loading') {
+      window.addEventListener('DOMContentLoaded', initEliWindow);
+    } else {
+      initEliWindow();
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const splitter = document.getElementById('formatSplitter');
+      const promptBox = document.getElementById('format_prompt_container');
+      const tabPane = document.getElementById('tab_format');
+
+      if (!splitter || !promptBox || !tabPane) return;
+
+      let isDragging = false;
+      let startY = 0;
+      let startHeight = 0;
+
+      splitter.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        startY = e.clientY;
+        startHeight = promptBox.getBoundingClientRect().height;
+        document.body.style.cursor = 'row-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const deltaY = e.clientY - startY;
+        const totalAvail = tabPane.clientHeight - 160;
+        const newHeight = Math.max(60, Math.min(totalAvail, startHeight + deltaY));
+        applyPromptHeight(newHeight);
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (isDragging) {
+          isDragging = false;
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+        }
+      });
+    });
+
+    async function checkAIConnection() {
+      const badge = document.getElementById('ai-status-badge');
+      const alertBox = document.getElementById('ai-connection-alert');
+      const alertDetail = document.getElementById('ai-connection-detail');
+      const sendBtn = document.getElementById('ai-send-btn');
+      const input = document.getElementById('ai-input-message');
+
+      badge.className = "ml-2 text-[10px] px-2 py-0.5 rounded font-normal bg-amber-600 text-white animate-pulse";
+      badge.textContent = "確認中...";
+      alertBox.classList.add('hidden');
+
+      try {
+        const res = await fetch(`${API_ADDIN}/ai/health?account=${encodeURIComponent(currentAccount)}`);
+        const data = await res.json();
+        const isEn = (typeof currentAppLanguage !== "undefined" && currentAppLanguage === "en");
+        if (data.status === "ok") {
+          badge.className = "ml-2 text-[10px] px-2 py-0.5 rounded font-normal bg-emerald-600 text-white";
+          badge.textContent = isEn ? "🟢 Online" : "🟢 オンライン";
+          sendBtn.disabled = false;
+          input.disabled = false;
+        } else {
+          throw new Error(data.error || "応答なし");
+        }
+      } catch (err) {
+        const isEn = (typeof currentAppLanguage !== "undefined" && currentAppLanguage === "en");
+        badge.className = "ml-2 text-[10px] px-2 py-0.5 rounded font-normal bg-rose-600 text-white";
+        badge.textContent = isEn ? "🔴 Offline" : "🔴 オフライン";
+        alertDetail.textContent = err.message;
+        alertBox.classList.remove('hidden');
+        sendBtn.disabled = true;
+        input.disabled = true;
+      }
+    }
+
+    function handleAIChatKeyDown(e) {
+      if (e.isComposing || e.keyCode === 229) return;
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        sendAIChatMessage();
+      }
+    }
+
+async function sendAIChatMessage() {
+      const input = document.getElementById('ai-input-message');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const isEn = (typeof currentAppLanguage !== 'undefined' && currentAppLanguage === 'en') ||
+                   (typeof currentLang !== 'undefined' && currentLang === 'en');
+
+      const logs = document.getElementById('ai-chat-logs');
+      const sendBtn = document.getElementById('ai-send-btn');
+      const barText = document.getElementById('eliStatusText');
+      const barDot = document.getElementById('eliStatusDot');
+      const barTimer = document.getElementById('eliTimerText');
+
+      const userBubble = document.createElement('div');
+      userBubble.className = "flex justify-end my-1.5";
+      userBubble.innerHTML = `
+        <div class="chat-bubble chat-bubble-user shadow-sm select-text cursor-text">
+          ${escapeHtml(text)}
+        </div>
+      `;
+      logs.appendChild(userBubble);
+
+      input.value = '';
+      sendBtn.disabled = true;
+      sendBtn.textContent = isEn ? 'Thinking...' : '思考中...';
+
+      barText.textContent = isEn ? "Eli is thinking..." : "Eliが回答を思考中...";
+      barDot.className = "w-2 h-2 rounded-full bg-amber-400 animate-ping";
+      
+      const startTime = performance.now();
+      if (formatTimerId) clearInterval(formatTimerId);
+      barTimer.textContent = "⏱ 0.0s";
+      formatTimerId = setInterval(() => {
+        const sec = ((performance.now() - startTime) / 1000).toFixed(1);
+        barTimer.textContent = `⏱ ${sec}s`;
+      }, 100);
+
+      const thinkingText = isEn ? 'Eli is thinking...' : 'Eliが考えています...';
+      const loadingBubble = document.createElement('div');
+      loadingBubble.className = "flex items-start space-x-2 my-1.5";
+      loadingBubble.innerHTML = `
+        <img src="/api/addin/eli_assistant/icon" alt="Eli" class="w-7 h-7 object-contain select-none" onerror="this.src='/static/icon/eli3.png'">
+        <div class="bg-white border border-gray-200 p-2 rounded-lg shadow-sm text-gray-500 italic text-xs">
+          ${thinkingText}
+        </div>
+      `;
+      logs.appendChild(loadingBubble);
+      logs.scrollTop = logs.scrollHeight;
+
+      try {
+        const res = await fetch(`${API_ADDIN}/ai/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: text,
+            selected_text: selectedQuoteText,
+            account: currentAccount,
+            history: isMultiTurnMode ? chatConversationHistory : []
+          })
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || `HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+
+        if (isMultiTurnMode) {
+          chatConversationHistory.push({ role: "user", content: text });
+          chatConversationHistory.push({ role: "assistant", content: data.reply });
+        }
+
+        clearInterval(formatTimerId);
+        loadingBubble.remove();
+
+        const durationSec = ((performance.now() - startTime) / 1000).toFixed(1);
+        barTimer.textContent = isEn ? `⏱ ${durationSec}s (Done)` : `⏱ ${durationSec}s (完了)`;
+        barText.textContent = "Ready";
+        barDot.className = "w-2 h-2 rounded-full bg-emerald-400";
+
+        const replyHtml = escapeHtml(data.reply).replace(/\n/g, '<br>');
+        const insertBtnLabel = isEn ? "📝 Insert to Note" : "📝 AINノートに挿入";
+        const botBubble = document.createElement('div');
+        botBubble.className = "flex items-start space-x-2 my-1.5";
+        botBubble.innerHTML = `
+          <img src="/api/addin/eli_assistant/icon" alt="Eli" class="w-7 h-7 object-contain select-none" onerror="this.src='/static/icon/eli3.png'">
+          <div class="chat-bubble chat-bubble-bot shadow-sm select-text cursor-text">
+            <div class="select-text">${replyHtml}</div>
+            <div class="mt-2 pt-1 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-400 select-none">
+              <span class="font-mono text-[10px]">⏱ ${durationSec}s</span>
+              <button onclick="sendTextToMainWindow('${escapeAttr(data.reply)}')" class="text-teal-700 hover:text-teal-900 font-bold hover:underline cursor-pointer">
+                ${insertBtnLabel}
+              </button>
+            </div>
+          </div>
+        `;
+        logs.appendChild(botBubble);
+        clearQuote();
+      } catch (e) {
+        clearInterval(formatTimerId);
+        loadingBubble.remove();
+        
+        const errSec = ((performance.now() - startTime) / 1000).toFixed(1);
+        barTimer.textContent = isEn ? `⏱ ${errSec}s (Aborted)` : `⏱ ${errSec}s (中断)`;
+        barText.textContent = `${isEn ? 'Error' : 'エラー'}: ${e.message}`;
+        barDot.className = "w-2 h-2 rounded-full bg-rose-500";
+
+        const errBubble = document.createElement('div');
+        errBubble.className = "flex items-start space-x-2";
+        errBubble.innerHTML = `
+          <span class="text-lg select-none">⚠️</span>
+          <div class="chat-bubble bg-red-50 border border-red-200 text-red-700 p-2.5 rounded-lg max-w-[85%] select-text">
+            ${isEn ? 'Error' : 'エラー'}: ${escapeHtml(e.message)}
+          </div>
+        `;
+        logs.appendChild(errBubble);
+      } finally {
+        const isEnFin = (typeof currentAppLanguage !== 'undefined' && currentAppLanguage === 'en') ||
+                        (typeof currentLang !== 'undefined' && currentLang === 'en');
+        sendBtn.disabled = false;
+        sendBtn.textContent = isEnFin ? 'Send' : '送信';
+        logs.scrollTop = logs.scrollHeight;
+      }
+    }
+
+    function clearAIChatLogs() {
+      chatConversationHistory = [];
+      document.getElementById('ai-chat-logs').innerHTML = `
+        <div class="flex items-start space-x-2 my-1.5">
+          <img src="/api/addin/eli_assistant/icon" alt="Eli" class="w-7 h-7 object-contain select-none" onerror="this.src='/static/icon/eli3.png'">
+          <div class="chat-bubble chat-bubble-bot shadow-sm select-text cursor-text">
+            会話履歴をクリアしました。何かお手伝いできることはありますか？
+          </div>
+        </div>
+      `;
+    }
+
+    function clearQuote() {
+      selectedQuoteText = "";
+      document.getElementById('ai-quote-preview').classList.add('hidden');
+    }
+
+    // 🧩 汎用アドイン連携ブリッジ (ain_addin_bridge)
+    const addinBridge = new BroadcastChannel('ain_addin_bridge');
+    addinBridge.onmessage = (event) => {
+      const data = event.data;
+      if (!data) return;
+      if ((data.action === 'selection_on_open' || data.action === 'response_selection') && data.text) {
+        selectedQuoteText = data.text;
+        document.getElementById('ai-quote-text').textContent = selectedQuoteText;
+        document.getElementById('ai-quote-preview').classList.remove('hidden');
+      }
+    };
+
+    function sendTextToMainWindow(text) {
+      addinBridge.postMessage({ action: 'insert_text', text: text });
+    }
+    function resetDefaultFormatPrompt() {
+      document.getElementById('elog_format_prompt').value = DEFAULT_ELOG_PROMPT;
+    }
+
+    // 📁 ログ選択ダイアログ
+    let dialogSelectedDate = "";
+
+    async function openLogSelectDialog() {
+      const modal = document.getElementById('modalLogSelect');
+      const tbody = document.getElementById('logFileListBody');
+      const previewBox = document.getElementById('preview_log_text');
+      const confirmBtn = document.getElementById('btn_confirm_select_log');
+
+      modal.classList.remove('hidden');
+      confirmBtn.disabled = true;
+      tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-gray-400">ログ一覧を取得中...</td></tr>';
+      previewBox.textContent = "（ファイルを選択してください）";
+      document.getElementById('preview_log_name').textContent = "未選択";
+
+      try {
+        const res = await fetch(`${API_ADDIN}/elog/files?account=${encodeURIComponent(currentAccount)}`);
+        const data = await res.json();
+        const files = data.files || [];
+
+        tbody.innerHTML = '';
+        if (files.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-gray-400">利用可能なログがありません</td></tr>';
+          return;
+        }
+
+        files.forEach(item => {
+          const d = item.date;
+          const tr = document.createElement('tr');
+          tr.className = "hover:bg-blue-50 transition-colors select-none";
+          tr.dataset.date = d;
+          
+          const y = d.substring(0, 4), m = d.substring(4, 6), date = d.substring(6, 8);
+          const statusBadge = item.is_converted
+            ? `<span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold rounded text-[10px]">Converted</span>`
+            : `<span class="px-2 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px]">Ready</span>`;
+
+          tr.innerHTML = `
+            <td class="py-1.5 px-3 border-r border-gray-200 font-bold text-teal-800">${item.name}</td>
+            <td class="py-1.5 px-3 border-r border-gray-200 text-gray-600">${y}/${m}/${date}</td>
+            <td class="py-1.5 px-3 text-[10px]" id="status_cell_${d}">${statusBadge}</td>
+          `;
+
+          tr.onclick = () => selectLogInDialog(d, tr);
+          tr.ondblclick = () => {
+            selectLogInDialog(d, tr);
+            confirmSelectedLog();
+          };
+
+          tbody.appendChild(tr);
+        });
+
+        if (activeDateStr) {
+          const currentTr = tbody.querySelector(`tr[data-date="${activeDateStr}"]`);
+          if (currentTr) selectLogInDialog(activeDateStr, currentTr);
+        }
+
+      } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-rose-500">一覧の取得に失敗しました</td></tr>';
+      }
+    }
+
+    function closeLogSelectDialog() {
+      document.getElementById('modalLogSelect').classList.add('hidden');
+    }
+
+    async function selectLogInDialog(dateStr, trElem) {
+      dialogSelectedDate = dateStr;
+
+      document.querySelectorAll('#logFileListBody tr').forEach(r => {
+        r.classList.remove('bg-teal-100', 'hover:bg-teal-100', 'font-bold');
+      });
+      trElem.classList.add('bg-teal-100', 'hover:bg-teal-100', 'font-bold');
+
+      document.getElementById('preview_log_name').textContent = `${dateStr}.html`;
+      const previewBox = document.getElementById('preview_log_text');
+      previewBox.textContent = "プレビューを読み込み中...";
+
+      try {
+        const res = await fetch(`${API_BASE}/logs/${dateStr}?account=${encodeURIComponent(currentAccount)}`);
+        const data = await res.json();
+        
+        if (data.exists && data.content_html) {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(data.content_html, 'text/html');
+          
+          doc.querySelectorAll('img').forEach(img => {
+            const span = doc.createElement('span');
+            span.textContent = ' [📷 画像] ';
+            img.replaceWith(span);
+          });
+
+          const rawText = doc.body.innerText.trim();
+          previewBox.textContent = rawText || "（テキスト本文が空です）";
+        } else {
+          previewBox.textContent = "（ログデータが存在しません）";
+        }
+
+        document.getElementById('btn_confirm_select_log').disabled = false;
+        document.getElementById('log_dialog_status').textContent = `選択中: ${dateStr}.html`;
+      } catch (err) {
+        previewBox.textContent = "プレビュー取得エラー: " + err.message;
+      }
+    }
+
+    async function confirmSelectedLog() {
+      if (!dialogSelectedDate) return;
+      activeDateStr = dialogSelectedDate;
+
+      document.getElementById('label_selected_logfile').textContent = `${activeDateStr}.html`;
+      document.getElementById('elog_file_target').textContent = `./eLog/${currentAccount}/${activeDateStr}_elog.md`;
+
+      closeLogSelectDialog();
+
+      rawSourceHtmlContent = "";
+      strippedHtmlContent = "";
+      strippedPlainText = "";
+      currentFormattedMarkdown = "";
+
+      const sel = document.getElementById('sel_elog_view_mode');
+      sel.innerHTML = `
+        <option value="source">ログ：ソース</option>
+        <option value="stripped">ログ：画像除去</option>
+        <option value="formatted">ログ：確認中...</option>
+      `;
+
+      try {
+        const logRes = await fetch(`${API_BASE}/logs/${activeDateStr}?account=${encodeURIComponent(currentAccount)}`);
+        const logData = await logRes.json();
+        if (logData.exists && logData.content_html) {
+          rawSourceHtmlContent = logData.content_html;
+        }
+
+        const elogRes = await fetch(`${API_ADDIN}/elog/get/${encodeURIComponent(currentAccount)}/${activeDateStr}`);
+        if (elogRes.ok) {
+          const elogData = await elogRes.json();
+          if (elogData.exists && elogData.markdown) {
+            currentFormattedMarkdown = elogData.markdown;
+          }
+        }
+      } catch (e) {
+        console.warn("Log fetch failed", e);
+      }
+
+      updateFormattedOptionLabel();
+      sel.value = "source";
+      renderViewMode("source");
+    }
+
+    function updateFormattedOptionLabel() {
+      const sel = document.getElementById('sel_elog_view_mode');
+      const formattedOpt = sel.querySelector('option[value="formatted"]');
+      if (!formattedOpt) return;
+
+      if (currentFormattedMarkdown.trim()) {
+        formattedOpt.textContent = "ログ：Eli整形後";
+      } else {
+        formattedOpt.textContent = "ログ：未整形";
+      }
+    }
+
+    function onViewModeChange(mode) {
+      renderViewMode(mode);
+    }
+
+    function renderViewMode(mode) {
+      const htmlViewer = document.getElementById('elog_html_viewer');
+      const textEditor = document.getElementById('elog_formatted_text');
+
+      if (mode === "source") {
+        htmlViewer.classList.remove('hidden');
+        textEditor.classList.add('hidden');
+        htmlViewer.innerHTML = rawSourceHtmlContent || '<span class="text-gray-400 text-xs">（HTMLソースが空です）</span>';
+
+      } else if (mode === "stripped") {
+        htmlViewer.classList.remove('hidden');
+        textEditor.classList.add('hidden');
+
+        if (!strippedHtmlContent && rawSourceHtmlContent) {
+          generateStrippedContent();
+        }
+        htmlViewer.innerHTML = strippedHtmlContent || '<span class="text-gray-400 text-xs">（ログ内容がありません）</span>';
+
+      } else if (mode === "formatted") {
+        htmlViewer.classList.add('hidden');
+        textEditor.classList.remove('hidden');
+
+        textEditor.value = currentFormattedMarkdown;
+        if (!currentFormattedMarkdown.trim()) {
+          textEditor.placeholder = "（未整形）ここにエマ等の整形結果Markdownを貼り付けて「./eLog へ保存」できます。";
+        }
+        textEditor.focus();
+      }
+    }
+
+    function generateStrippedContent() {
+      if (!rawSourceHtmlContent) return;
+      try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(rawSourceHtmlContent, 'text/html');
+
+        doc.querySelectorAll('script, style, noscript, svg').forEach(el => el.remove());
+
+        doc.querySelectorAll('img').forEach(img => {
+          const badge = doc.createElement('span');
+          badge.style.cssText = "display: inline-block; padding: 2px 6px; margin: 2px 0; background-color: #f3f4f6; color: #4b5563; border: 1px dashed #9ca3af; border-radius: 4px; font-size: 11px; font-family: monospace;";
+          badge.textContent = "📷（画像）";
+          img.replaceWith(badge);
+        });
+
+        strippedHtmlContent = doc.body.innerHTML;
+        strippedPlainText = doc.body.innerText.replace(/data:image\/[^;]+;base64,[a-zA-Z0-9+/=]+/g, '（画像）');
+        strippedPlainText = strippedPlainText.replace(/\n{3,}/g, '\n\n').trim();
+      } catch (e) {
+        console.error("Strip error", e);
+      }
+    }
+
+    async function runElogFormat() {
+      const targetDate = activeDateStr;
+      if (!targetDate) {
+        alert("整形するログファイルを選択してください。");
+        return;
+      }
+
+      if (!strippedPlainText) {
+        generateStrippedContent();
+      }
+
+      const btn = document.getElementById('btn_run_elog_format');
+      const promptVal = document.getElementById('elog_format_prompt').value;
+      const barText = document.getElementById('eliStatusText');
+      const barDot = document.getElementById('eliStatusDot');
+      const barTimer = document.getElementById('eliTimerText');
+
+      btn.disabled = true;
+      barText.textContent = `Eliがログ整形中 (${targetDate}.html)...`;
+      barDot.className = "w-2 h-2 rounded-full bg-amber-400 animate-ping";
+
+      const startTime = performance.now();
+      if (formatTimerId) clearInterval(formatTimerId);
+      barTimer.textContent = "⏱ 0.0s";
+      formatTimerId = setInterval(() => {
+        const sec = ((performance.now() - startTime) / 1000).toFixed(1);
+        barTimer.textContent = `⏱ ${sec}s`;
+      }, 100);
+
+      try {
+        const res = await fetch(`${API_ADDIN}/elog/format`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            date_str: targetDate,
+            account: currentAccount,
+            custom_prompt: promptVal,
+            raw_text_override: strippedPlainText
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "整形に失敗しました");
+
+        clearInterval(formatTimerId);
+        const finalSec = ((performance.now() - startTime) / 1000).toFixed(1);
+        barTimer.textContent = `⏱ ${finalSec}s (完了)`;
+
+        currentFormattedMarkdown = data.formatted_markdown;
+        updateFormattedOptionLabel();
+        const sel = document.getElementById('sel_elog_view_mode');
+        sel.value = "formatted";
+        renderViewMode("formatted");
+
+        barText.textContent = `整形完了: ${targetDate}_elog.md（未保存）`;
+        barDot.className = "w-2 h-2 rounded-full bg-emerald-400";
+
+      } catch (err) {
+        clearInterval(formatTimerId);
+        const errSec = ((performance.now() - startTime) / 1000).toFixed(1);
+        barTimer.textContent = `⏱ ${errSec}s (中断)`;
+        barText.textContent = `整形失敗: ${err.message}`;
+        barDot.className = "w-2 h-2 rounded-full bg-rose-500";
+        alert("Log整形エラー:\n" + err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function saveFormattedElog() {
+      const textEditor = document.getElementById('elog_formatted_text');
+      const mdText = textEditor.value;
+      if (!mdText.trim()) {
+        alert("保存する整形ログが空です。");
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_ADDIN}/elog/save`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            date_str: activeDateStr,
+            account: currentAccount,
+            markdown: mdText
+          })
+        });
+        if (!res.ok) throw new Error("保存失敗");
+        
+        currentFormattedMarkdown = mdText;
+        updateFormattedOptionLabel();
+
+        alert(`eLog/${currentAccount}/${activeDateStr}_elog.md に保存しました。`);
+      } catch (err) {
+        alert("eLog保存エラー: " + err.message);
+      }
+    }
+
+    async function fetchEliRagStatus() {
+      const countBadge = document.getElementById('eli-rag-doc-count');
+      const targetAccEl = document.getElementById('eli-rag-target-account');
+      const monitorAcc = document.getElementById('eli-rag-monitor-account');
+      const monitorCount = document.getElementById('eli-rag-monitor-count');
+      const filesBadge = document.getElementById('eli-rag-files-badge');
+      const chipsContainer = document.getElementById('eli-rag-file-chips');
+
+      const acc = (typeof currentAccount === "string" && currentAccount.trim()) ? currentAccount.trim() : "default";
+      if (targetAccEl) targetAccEl.textContent = acc;
+      if (monitorAcc) monitorAcc.textContent = acc;
+
+      try {
+        const res = await fetch(`${API_ADDIN}/rag/status?account=${encodeURIComponent(acc)}`);
+        const data = await res.json();
+
+        if (data.status === "error") {
+          throw new Error(data.error);
+        }
+
+        let filesList = Array.isArray(data.indexed_files) ? data.indexed_files : [];
+        filesList.sort().reverse();
+
+        const chunkCount = typeof data.chunk_count === "number" ? data.chunk_count : 0;
+        const isEn = (typeof currentAppLanguage !== "undefined" && currentAppLanguage === "en");
+
+        if (countBadge) {
+          countBadge.textContent = isEn ? `${chunkCount} chunks indexed` : `${chunkCount} チャンク登録済`;
+        }
+        if (monitorCount) monitorCount.textContent = filesList.length;
+        if (filesBadge) filesBadge.textContent = `${filesList.length} files`;
+
+        if (chipsContainer) {
+          if (filesList.length === 0) {
+            chipsContainer.innerHTML = '<span class="text-gray-400 text-xs p-1">（登録済みのelogはありません）</span>';
+          } else {
+            chipsContainer.innerHTML = filesList.map(fname => {
+              const datePart = fname.replace('_elog.md', '').replace('.md', '');
+              return `
+                <div class="inline-flex items-center gap-1 px-2 py-0.5 bg-white border border-gray-300 hover:border-purple-400 text-gray-700 rounded text-[11px] font-mono shadow-2xs transition-colors">
+                  <span class="text-[10px] text-purple-600">📄</span>
+                  <span class="font-bold text-gray-800">${escapeHtml(datePart)}</span>
+                  <span class="text-[10px] text-gray-400">_elog.md</span>
+                </div>
+              `;
+            }).join('');
+          }
+        }
+      } catch (err) {
+        if (countBadge) countBadge.textContent = `取得失敗`;
+        if (chipsContainer) {
+          chipsContainer.innerHTML = `<span class="text-rose-600 font-bold p-1">⚠️ 状態取得エラー: ${escapeHtml(err.message)}</span>`;
+        }
+      }
+    }
+
+    async function runRagRebuildAll() {
+      if (!confirm("既存のインデックスを初期化し、全 eLog から RAG を完全に再構築します。\n実行しますか？")) {
+        return;
+      }
+
+      const btn = document.getElementById('btn-eli-rag-rebuild');
+      const statusMsg = document.getElementById('eli-rag-status-msg');
+      const barText = document.getElementById('eliStatusText');
+      const barDot = document.getElementById('eliStatusDot');
+      const barTimer = document.getElementById('eliTimerText');
+
+      btn.disabled = true;
+      btn.innerHTML = `<span>⏳</span> 再構築中...`;
+      statusMsg.textContent = "全 eLog を解析して ChromaDB を再構築しています...";
+      statusMsg.className = "text-xs text-purple-600 font-mono animate-pulse";
+
+      barText.textContent = "EliがローカルRAGを全再構築中...";
+      barDot.className = "w-2 h-2 rounded-full bg-amber-400 animate-ping";
+
+      const startTime = performance.now();
+      if (formatTimerId) clearInterval(formatTimerId);
+      barTimer.textContent = "⏱ 0.0s";
+      formatTimerId = setInterval(() => {
+        const sec = ((performance.now() - startTime) / 1000).toFixed(1);
+        barTimer.textContent = `⏱ ${sec}s`;
+      }, 100);
+
+      try {
+        const acc = (typeof currentAccount === "string" && currentAccount.trim()) ? currentAccount.trim() : "default";
+        const res = await fetch(`${API_ADDIN}/rag/rebuild_all`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ account: acc })
+        });
+        
+        const data = await res.json();
+        if (!res.ok || data.status === "error") {
+          throw new Error(data.error || data.detail || `HTTP ${res.status}`);
+        }
+
+        clearInterval(formatTimerId);
+        const finalSec = ((performance.now() - startTime) / 1000).toFixed(1);
+        barTimer.textContent = `⏱ ${finalSec}s (完了)`;
+        barText.textContent = "Ready";
+        barDot.className = "w-2 h-2 rounded-full bg-emerald-400";
+
+        statusMsg.textContent = `✅ 完了: ${data.total_files} ファイル (${data.total_chunks} チャンク) を再構築しました`;
+        statusMsg.className = "text-xs text-emerald-600 font-bold font-mono";
+
+        await fetchEliRagStatus();
+        alert(`【RAG 全再構築 完了】\n\n処理時間: ${finalSec} 秒\n対象ファイル数: ${data.total_files} 件\n登録チャンク数: ${data.total_chunks} 件\n\n日付見出し付きの新しいインデックスが作成されました。`);
+
+      } catch (err) {
+        clearInterval(formatTimerId);
+        const errSec = ((performance.now() - startTime) / 1000).toFixed(1);
+        barTimer.textContent = `⏱ ${errSec}s (中断)`;
+        barText.textContent = `再構築失敗: ${err.message}`;
+        barDot.className = "w-2 h-2 rounded-full bg-rose-500";
+
+        statusMsg.textContent = `⚠️ エラー: ${err.message}`;
+        statusMsg.className = "text-xs text-rose-600 font-bold font-mono";
+        alert("RAG 全再構築エラー:\n" + err.message);
+
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<span>⚠️</span> 全再構築 (クリーン)`;
+      }
+    }
+
+    async function runRagSyncDiff() {
+      if (!activeDateStr) {
+        alert("同期対象のログ日付が選択されていません。");
+        return;
+      }
+
+      const btn = document.getElementById('btn-eli-rag-sync');
+      const statusMsg = document.getElementById('eli-rag-status-msg');
+      const barText = document.getElementById('eliStatusText');
+      const barDot = document.getElementById('eliStatusDot');
+      const barTimer = document.getElementById('eliTimerText');
+
+      btn.disabled = true;
+      btn.innerHTML = `<span>⏳</span> 同期中...`;
+      barText.textContent = `Eliが ${activeDateStr} のログをRAGへ差分同期中...`;
+      barDot.className = "w-2 h-2 rounded-full bg-amber-400 animate-ping";
+
+      const startTime = performance.now();
+      if (formatTimerId) clearInterval(formatTimerId);
+      barTimer.textContent = "⏱ 0.0s";
+      formatTimerId = setInterval(() => {
+        const sec = ((performance.now() - startTime) / 1000).toFixed(1);
+        barTimer.textContent = `⏱ ${sec}s`;
+      }, 100);
+
+      try {
+        const acc = (typeof currentAccount === "string" && currentAccount.trim()) ? currentAccount.trim() : "default";
+        const res = await fetch(`${API_ADDIN}/rag/sync`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ date_str: activeDateStr, account: acc })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "同期失敗");
+
+        clearInterval(formatTimerId);
+        const finalSec = ((performance.now() - startTime) / 1000).toFixed(1);
+        barTimer.textContent = `⏱ ${finalSec}s (完了)`;
+        barText.textContent = "Ready";
+        barDot.className = "w-2 h-2 rounded-full bg-emerald-400";
+
+        statusMsg.textContent = `✅ ${activeDateStr} を登録しました (${data.indexed_chunks || 0} チャンク)`;
+        statusMsg.className = "text-xs text-emerald-600 font-bold font-mono";
+        await fetchEliRagStatus();
+        alert(`${activeDateStr} の差分登録が完了しました。`);
+
+      } catch (err) {
+        clearInterval(formatTimerId);
+        barText.textContent = "同期失敗";
+        barDot.className = "w-2 h-2 rounded-full bg-rose-500";
+        alert("差分同期エラー:\n" + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<span>➕</span> 新規elogを差分追加`;
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/[&<>"']/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[m]));
+    }
+    function escapeAttr(str) {
+      if (!str) return '';
+      return str.replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n');
+    }
+
+    const eliI18nChannel = new BroadcastChannel('ain_i18n_channel');
+    eliI18nChannel.onmessage = (e) => {
+      if (e.data && e.data.action === 'change_lang') {
+        applyEliLang(e.data.lang || e.data.language);
+      }
+    };
+
+  </script>
+</body>
+</html>

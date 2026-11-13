@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>AIN - リンク集</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="h-screen flex flex-col bg-slate-50 text-gray-800 text-xs p-3 select-none">
+  <!-- ヘッダー -->
+  <div class="flex justify-between items-center pb-2 border-b border-gray-300">
+    <span id="lbl-title" class="font-bold text-sm text-sky-800">🔗 ブックマーク・リンク集</span>
+    <button id="btn-add" onclick="addLinkRow()" class="px-2.5 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded font-bold transition-colors">+ 追加</button>
+  </div>
+
+  <!-- リスト表示部 -->
+  <div id="links-container" class="flex-1 overflow-y-auto py-2 space-y-2 select-text"></div>
+
+  <!-- フッター -->
+  <div class="pt-2 border-t border-gray-300 flex justify-end space-x-2">
+    <button id="btn-save" onclick="saveLinks()" class="px-4 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded font-bold shadow-sm transition-colors">保存</button>
+  </div>
+
+  <script>
+    const i18nDict = {
+      ja: {
+        title: "🔗 ブックマーク・リンク集",
+        add: "+ 追加",
+        save: "保存",
+        saved: "保存しました。",
+        open: "開く",
+        phTitle: "タイトル",
+        phUrl: "https://..."
+      },
+      en: {
+        title: "🔗 Bookmarks & Links",
+        add: "+ Add",
+        save: "Save",
+        saved: "Saved successfully.",
+        open: "Open",
+        phTitle: "Title",
+        phUrl: "https://..."
+      }
+    };
+
+    let currentLang = 'ja';
+
+    function applyLang(lang) {
+      if (!lang) return;
+      currentLang = (lang === 'en') ? 'en' : 'ja';
+      const d = i18nDict[currentLang];
+
+      const elTitle = document.getElementById('lbl-title');
+      const elAdd = document.getElementById('btn-add');
+      const elSave = document.getElementById('btn-save');
+
+      if (elTitle) elTitle.textContent = d.title;
+      if (elAdd) elAdd.textContent = d.add;
+      if (elSave) elSave.textContent = d.save;
+
+      document.querySelectorAll('.btn-open').forEach(b => b.textContent = d.open);
+      document.querySelectorAll('.link-title').forEach(i => i.placeholder = d.phTitle);
+      document.querySelectorAll('.link-url').forEach(i => i.placeholder = d.phUrl);
+
+      // 🌟 ここを追加: OSのタイトルバー（pywebview）も言語連動
+      const winTitle = (currentLang === 'en') ? "AIN - Bookmarks & Links" : "AIN - リンク集";
+      document.title = winTitle;
+      fetch('/api/set_window_title', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ win_key: 'window_addin_links', title: winTitle })
+      }).catch(() => {});
+    }
+
+    async function loadLinks() {
+      try {
+        const res = await fetch('/api/addin/links/data');
+        const data = await res.json();
+        const container = document.getElementById('links-container');
+        container.innerHTML = '';
+        (data.links || []).forEach(item => addLinkRow(item.title, item.url));
+      } catch (e) {
+        console.error("リンク読み込み失敗", e);
+      }
+    }
+
+    function addLinkRow(title = '', url = '') {
+      const d = i18nDict[currentLang] || i18nDict.ja;
+      const div = document.createElement('div');
+      div.className = "flex items-center space-x-1.5 bg-white p-1.5 border border-gray-300 rounded shadow-xs";
+      div.innerHTML = `
+        <input type="text" placeholder="${d.phTitle}" value="${escapeAttr(title)}" class="link-title w-1/3 border border-gray-300 p-1 rounded outline-none focus:border-sky-500">
+        <input type="text" placeholder="${d.phUrl}" value="${escapeAttr(url)}" class="link-url flex-1 border border-gray-300 p-1 rounded font-mono outline-none focus:border-sky-500">
+        <button onclick="openExternalUrl(this)" class="btn-open px-2.5 py-1 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded font-bold text-sky-700 whitespace-nowrap">${d.open}</button>
+        <button onclick="this.parentElement.remove()" class="px-2 py-1 text-red-500 hover:bg-red-50 rounded font-bold">✕</button>
+      `;
+      document.getElementById('links-container').appendChild(div);
+    }
+
+    // OS規定のブラウザを呼び出す（pywebviewのポップアップブロック回避）
+    async function openExternalUrl(btn) {
+      const row = btn.parentElement;
+      const urlInput = row.querySelector('.link-url');
+      const targetUrl = urlInput ? urlInput.value.trim() : '';
+      if (!targetUrl) return;
+
+      try {
+        await fetch('/api/addin/links/open_browser', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: targetUrl })
+        });
+      } catch (err) {
+        alert("ブラウザ起動エラー: " + err.message);
+      }
+    }
+
+    async function saveLinks() {
+      const titles = document.querySelectorAll('.link-title');
+      const urls = document.querySelectorAll('.link-url');
+      const links = [];
+      titles.forEach((t, i) => {
+        const valTitle = t.value.trim();
+        const valUrl = urls[i].value.trim();
+        if (valTitle || valUrl) {
+          links.push({ title: valTitle, url: valUrl });
+        }
+      });
+
+      try {
+        await fetch('/api/addin/links/data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ links })
+        });
+        const d = i18nDict[currentLang] || i18nDict.ja;
+        alert(d.saved);
+      } catch (e) {
+        alert("保存失敗: " + e.message);
+      }
+    }
+
+    function escapeAttr(str) {
+      if (!str) return '';
+      return str.replace(/"/g, '&quot;');
+    }
+
+    // AIN2本体の BroadcastChannel（ain_i18n_channel）を受信
+    const i18nChannel = new BroadcastChannel('ain_i18n_channel');
+    i18nChannel.onmessage = (e) => {
+      if (e.data && e.data.action === 'change_lang') {
+        applyLang(e.data.lang || e.data.language);
+      }
+    };
+
+    // 起動時の初期化
+    fetch('/api/config')
+      .then(res => res.json())
+      .then(cfg => {
+        applyLang(cfg.language || 'ja');
+        loadLinks();
+      })
+      .catch(() => {
+        applyLang('ja');
+        loadLinks();
+      });
+  </script>
+</body>
+</html>

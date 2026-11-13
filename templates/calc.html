@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AIN Calculator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/static/js/ain_calc_engine.js"></script>
+
+  <style>
+    body.dark-mode {
+      background-color: #1e1e1e !important;
+      color: #d4d4d4 !important;
+    }
+    body.dark-mode header {
+      background-color: #2d2d2d !important;
+      border-color: #404040 !important;
+      color: #e0e0e0 !important;
+    }
+    body.dark-mode #calcEditor {
+      background-color: #1e1e1e !important;
+      color: #d4d4d4 !important;
+    }
+  </style>
+</head>
+<body class="h-screen flex flex-col bg-gray-100 font-sans select-none overflow-hidden text-gray-800">
+
+  <!-- Header -->
+  <header class="h-8 bg-[#e6e6e6] border-b border-gray-300 flex items-center px-3 justify-between text-xs select-none">
+
+    <div class="flex items-center space-x-2">
+      <span class="font-bold text-gray-700 flex items-center gap-1.5">
+        <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- 外枠（紺色） -->
+          <rect x="3.5" y="2" width="17" height="20" rx="3.5" stroke="#1e3a8a" stroke-width="1.8" fill="#f8fafc"/>
+          <!-- 液晶画面 -->
+          <rect x="5.5" y="4" width="13" height="4" rx="1" fill="#cbd5e1" stroke="#1e3a8a" stroke-width="1"/>
+          <!-- キー群 -->
+          <rect x="5.5" y="10" width="2" height="1.8" rx="0.4" fill="#1e3a8a"/>
+          <rect x="9" y="10" width="2" height="1.8" rx="0.4" fill="#1e3a8a"/>
+          <rect x="12.5" y="10" width="2" height="1.8" rx="0.4" fill="#1e3a8a"/>
+          <rect x="16" y="10" width="2" height="1.8" rx="0.4" fill="#1e3a8a"/>
+
+          <rect x="5.5" y="13" width="2" height="1.8" rx="0.4" fill="#1e3a8a"/>
+          <rect x="9" y="13" width="2" height="1.8" rx="0.4" fill="#1e3a8a"/>
+          <rect x="12.5" y="13" width="2" height="1.8" rx="0.4" fill="#1e3a8a"/>
+          <rect x="16" y="13" width="2" height="1.8" rx="0.4" fill="#1e3a8a"/>
+
+          <rect x="5.5" y="16" width="2" height="1.8" rx="0.4" fill="#1e3a8a"/>
+          <rect x="9" y="16" width="2" height="1.8" rx="0.4" fill="#1e3a8a"/>
+          <rect x="12.5" y="16" width="2" height="1.8" rx="0.4" fill="#1e3a8a"/>
+          <rect x="16" y="16" width="2" height="1.8" rx="0.4" fill="#1e3a8a"/>
+
+          <!-- 最下段（右下が赤のアクセントキー） -->
+          <rect x="5.5" y="19" width="2" height="1.8" rx="0.4" fill="#1e3a8a"/>
+          <rect x="9" y="19" width="2" height="1.8" rx="0.4" fill="#1e3a8a"/>
+          <rect x="12.5" y="19" width="5.5" height="1.8" rx="0.4" fill="#ef4444"/>
+        </svg>
+        <span>Scratchpad Calculator</span>
+      </span>
+      <span class="text-[11px] text-gray-500">(Type "?expr" and press Enter / "??" for Help)</span>
+    </div>
+
+    <div class="flex items-center space-x-2">
+      <button onclick="clearPad()" class="px-2 py-0.5 bg-gray-200 hover:bg-red-100 hover:text-red-700 border border-gray-400 rounded text-xs transition-colors">Clear</button>
+    </div>
+  </header>
+
+  <!-- Plain Editor Area -->
+  <main class="flex-1 p-3 overflow-y-auto bg-[#fffff7]">
+    <div id="calcEditor" contenteditable="true"
+         autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+         class="w-full h-full min-h-[300px] outline-none leading-relaxed text-gray-900 text-sm font-mono whitespace-pre-wrap"></div>
+  </main>
+
+  <script>
+    const API_BASE = `${window.location.origin}/api`;
+    const editor = document.getElementById('calcEditor');
+    let saveTimeout = null;
+
+    // 🌟 起動時にバックエンドからテキストを復元
+    async function initPadContent() {
+      try {
+        const res = await fetch(`${API_BASE}/calc_content`);
+        const data = await res.json();
+        editor.innerText = data.content || "";
+      } catch (e) {
+        editor.innerText = "# AIN Calculator & Scratchpad\n# (Type ?? and press Enter for help)\n\n";
+      }
+    }
+
+    // 🌟 バックエンドへの保存（デバウンス付き）
+    function savePadContent() {
+      clearTimeout(saveTimeout);
+      saveTimeout = setTimeout(async () => {
+        try {
+          await fetch(`${API_BASE}/calc_content`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ content: editor.innerText })
+          });
+        } catch (e) {}
+      }, 300);
+    }
+
+    // 即時保存（終了時など）
+    function savePadImmediate() {
+      try {
+        const text = editor.innerText;
+        const blob = new Blob([JSON.stringify({ content: text })], { type: 'application/json' });
+        navigator.sendBeacon(`${API_BASE}/calc_content`, blob);
+      } catch (e) {}
+    }
+
+    // 入力時・閉じる時に保存
+    editor.addEventListener('input', savePadContent);
+    window.addEventListener('beforeunload', savePadImmediate);
+    window.addEventListener('pagehide', savePadImmediate);
+
+    function clearPad() {
+      if (confirm("Clear all scratchpad calculations?")) {
+        editor.innerText = "";
+        savePadImmediate();
+        editor.focus();
+      }
+    }
+
+    // 🌟 共通計算エンジンに委任
+    editor.addEventListener('keydown', (e) => {
+      handleCalculationKeyDown(e, editor, API_BASE, savePadContent, true);
+    });
+
+    // 🌟 書式なしプレーンテキストのみのペーストに限定
+    editor.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+      if (text) {
+        document.execCommand('insertText', false, text);
+        savePadContent();
+      }
+    });
+
+    if (localStorage.getItem('ailab_theme_dark') === 'true') {
+      document.body.classList.add('dark-mode');
+    }
+
+    // 初期化実行
+    window.addEventListener('DOMContentLoaded', initPadContent);
+  </script>
+</body>
+</html>

@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>AILab_Note (AIN2)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/static/js/ain_i18n.js"></script>
+  <script src="/static/js/ain_calc_engine.js"></script>
+  <script src="/static/js/ain_canvas.js"></script>
+  <script src="/static/js/ain_main.js"></script>
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body class="h-screen flex flex-col bg-gray-100 font-sans select-none overflow-hidden text-gray-800">
+
+  <div class="flex-1 flex flex-row overflow-hidden relative">
+
+<!-- 1. 左サイドバー (標準メニュー ＆ アドイン連携) -->
+    <aside class="w-10 bg-[#f9f9f7] border-r border-gray-300 flex flex-col justify-between items-center py-1 z-20 shadow-sm select-none">
+      
+      <!-- 上段: ログ移動 ＆ ツール群 -->
+      <div class="flex flex-col items-center space-y-1 w-full px-0.5">
+        <!-- 日付ナビゲーション -->
+        <button onclick="SB_PrevClick()" data-i18n-title="btn_prev_day" title="前日へ" class="w-8 h-7 flex items-center justify-center text-amber-900 hover:bg-amber-100 rounded text-xs">◀</button>
+        <button onclick="SB_NextClick()" data-i18n-title="btn_next_day" title="翌日へ" class="w-8 h-7 flex items-center justify-center text-amber-900 hover:bg-amber-100 rounded text-xs">▶</button>
+        <button onclick="SB_FPrevClick()" data-i18n-title="btn_prev_log" title="前の記録へ" class="w-8 h-8 flex items-center justify-center text-amber-950 font-bold hover:bg-amber-100 rounded text-[11px]">◀◀</button>
+        <button onclick="SB_FNextClick()" data-i18n-title="btn_next_log" title="次の記録へ" class="w-8 h-8 flex items-center justify-center text-amber-950 font-bold hover:bg-amber-100 rounded text-[11px]">▶▶</button>
+
+        <div class="w-7 h-[1px] bg-gray-300 my-0.5"></div>
+
+        <!-- 🌟 標準ツール（基本機能） -->
+        <!-- ① カレンダー -->
+        <button onclick="CB_CalClick()" title="カレンダー" class="w-8 h-8 flex items-center justify-center hover:bg-blue-100 rounded text-base">📅</button>
+        <!-- ② 検索 -->
+        <button onclick="SB_FindClick()" title="ログ検索" class="w-8 h-8 flex items-center justify-center hover:bg-green-100 rounded text-base">🔍</button>
+        <!-- ③ メモ -->
+        <button onclick="SB_MemoClick()" title="メモ (Memorandum)" class="w-8 h-8 flex items-center justify-center hover:bg-amber-100 rounded text-base">✏️</button>
+        
+        <!-- ④ 電卓 (旧AINのこだわりSVG復元) -->
+        <button onclick="SB_CalcClick()" title="電卓 (Calculator)" class="w-8 h-8 flex items-center justify-center hover:bg-slate-200 rounded transition-colors">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="3.5" y="2" width="17" height="20" rx="3.5" stroke="#1e3a8a" stroke-width="1.8" fill="#f8fafc"/>
+            <rect x="5.5" y="4" width="13" height="4" rx="1" fill="#cbd5e1" stroke="#1e3a8a" stroke-width="1"/>
+            <rect x="5.5" y="10" width="2" height="1.8" rx="0.4" fill="#1e3a8a"/>
+            <rect x="9" y="10" width="2" height="1.8" rx="0.4" fill="#1e3a8a"/>
+            <rect x="12.5" y="10" width="2" height="1.8" rx="0.4" fill="#1e3a8a"/>
+            <rect x="16" y="10" width="2" height="1.8" rx="0.4" fill="#1e3a8a"/>
+            <rect x="5.5" y="13" width="2" height="1.8" rx="0.4" fill="#1e3a8a"/>
+            <rect x="9" y="13" width="2" height="1.8" rx="0.4" fill="#1e3a8a"/>
+            <rect x="12.5" y="13" width="2" height="1.8" rx="0.4" fill="#1e3a8a"/>
+            <rect x="16" y="13" width="2" height="1.8" rx="0.4" fill="#1e3a8a"/>
+            <rect x="5.5" y="16" width="2" height="1.8" rx="0.4" fill="#1e3a8a"/>
+            <rect x="9" y="16" width="2" height="1.8" rx="0.4" fill="#1e3a8a"/>
+            <rect x="12.5" y="16" width="2" height="1.8" rx="0.4" fill="#1e3a8a"/>
+            <rect x="16" y="16" width="2" height="1.8" rx="0.4" fill="#1e3a8a"/>
+            <rect x="5.5" y="19" width="2" height="1.8" rx="0.4" fill="#1e3a8a"/>
+            <rect x="9" y="19" width="2" height="1.8" rx="0.4" fill="#1e3a8a"/>
+            <rect x="12.5" y="19" width="5.5" height="1.8" rx="0.4" fill="#ef4444"/>
+          </svg>
+        </button>
+
+        <!-- 🔬 Fiji (ImageJ) 取り込みボタン: 角丸＆ぷっくりFijiモノグラムロゴ -->
+        <button onclick="insertFijiResultAtCursor()" title="Img & Log from Fiji (Fijiから画像と操作履歴を挿入)" class="w-8 h-8 flex items-center justify-center hover:bg-sky-100 rounded transition-colors group">
+          <svg class="w-5 h-5" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- 外枠 L字（fフレーム）: 太め＋角丸 -->
+            <path d="M2.5 28.5V8C1.5 4.34315 5.84315 3 7.5 1H27.5C28.3284 3 29 3.67157 29 4.5C29 5.32843 28.3284 6 27.5 6H8.5C7.94772 6 7.5 6.44772 7.5 7V28.5C7.5 29.3284 6.82843 30 6 30C5.17157 30 4.5 29.3284 4.5 28.5Z" fill="#2563eb" stroke="#1d4ed8" stroke-width="1.2" stroke-linejoin="round"/>
+            
+            <!-- 1文字目「i」: 太幅ピル（幅4.6px） -->
+            <rect x="10" y="8.5" width="4.6" height="12.5" rx="2.3" fill="#3b82f6" stroke="#1d4ed8" stroke-width="0.8"/>
+
+            <!-- 2文字目「j」: がっしりフック形状（線幅4.6px相当） -->
+            <path d="M17.5 8.5C18.8807 8.5 20 9.61929 20 11V23.5C20 25.433 18.433 27 16.5 27H11C10.1716 27 9.5 26.3284 9.5 25.5C9.5 24.6716 10.1716 24 11 24H16C16.5523 24 17 23.5523 17 23V11C17 9.61929 17.1193 8.5 17.5 8.5Z" fill="#2563eb" stroke="#1d4ed8" stroke-width="0.8" stroke-linejoin="round"/>
+
+            <!-- 3文字目「i」: 右端の太幅ピル（幅4.6px） -->
+            <rect x="23" y="8.5" width="4.6" height="12.5" rx="2.3" fill="#3b82f6" stroke="#1d4ed8" stroke-width="0.8"/>
+          </svg>
+        </button>
+
+        <!-- 🌟 区切り線 -->
+        <div class="w-7 h-[2px] bg-sky-400 my-1"></div>
+        <!-- 🌟 アドイン機能群 -->
+
+        <!-- 🌟 動的アドインマウント用コンテナ -->
+        <div id="dynamic-addin-container" class="flex flex-col items-center space-y-1 w-full">
+          <!-- ここに起動時、Addins/ フォルダ内のアイコンが自動注入されます -->
+        </div>
+
+        <!-- ⑧ 改竄検知・整合性検証（かじりネズミ退治） -->
+        <!--<button onclick="SB_TamperVerifyClick()" title="改竄検知・電子署名検証（準備中）" class="w-8 h-8 flex items-center justify-center hover:bg-amber-100 rounded text-base transition-colors" style="filter: grayscale(20%);">
+          🐭
+        </button>
+        -->
+      </div>
+
+      <!-- 下段: オプション設定 ＆ ロゴ情報 -->
+      <div class="flex flex-col items-center space-y-1 w-full px-0.5 pb-1 border-t border-gray-200 pt-1">
+        <button onclick="openOptionModal()" title="Option (設定)" class="w-8 h-7 flex items-center justify-center hover:bg-gray-200 rounded text-sm">⚙️</button>
+        <button onclick="SB_InfoClick()" title="About AIN (ロゴ・情報)" class="w-8 h-7 flex items-center justify-center hover:bg-gray-200 rounded text-sm text-blue-600 font-bold">ℹ️</button>
+      </div>
+    </aside>
+
+    <!-- 2. 📅 カレンダーポップアップパネル -->
+    <div id="calendarPanel" class="hidden absolute left-11 top-36 bg-[#d7ecd7] border border-gray-400 rounded shadow-2xl p-1 z-30 select-none w-[230px]">
+      <div class="flex items-center justify-between bg-[#d7ecd7] px-0.5 py-1 text-xs border-b border-gray-300">
+        <button onclick="calPrevMonth()" title="前月" class="w-6 h-6 flex items-center justify-center font-bold text-red-800 hover:bg-black/10 rounded">◀</button>
+        <div class="flex items-center bg-white border border-gray-400 rounded px-1 h-6">
+          <input id="calYear" type="text" readonly class="w-10 text-center font-bold text-xs outline-none bg-transparent select-none cursor-default">
+          <div class="flex flex-col ml-0.5 text-[8px] leading-[7px]">
+            <button onclick="changeCalYear(1)" class="hover:text-blue-600 font-bold">▲</button>
+            <button onclick="changeCalYear(-1)" class="hover:text-blue-600 font-bold">▼</button>
+          </div>
+        </div>
+        <div class="flex items-center bg-white border border-gray-400 rounded px-1 h-6">
+          <input id="calMonth" type="text" readonly class="w-5 text-center font-bold text-xs outline-none bg-transparent select-none cursor-default">
+          <div class="flex flex-col ml-0.5 text-[8px] leading-[7px]">
+            <button onclick="changeCalMonth(1)" class="hover:text-blue-600 font-bold">▲</button>
+            <button onclick="changeCalMonth(-1)" class="hover:text-blue-600 font-bold">▼</button>
+          </div>
+        </div>
+        <button onclick="calGoToday()" title="今日へジャンプ" class="w-6 h-6 flex items-center justify-center hover:bg-black/10 rounded text-sm">🏠</button>
+        <button onclick="calNextMonth()" title="翌月" class="w-6 h-6 flex items-center justify-center font-bold text-blue-900 hover:bg-black/10 rounded">▶</button>
+      </div>
+      <div class="grid grid-cols-7 text-center text-[11px] font-bold py-1 bg-[#c8e6c9] border-b border-gray-300">
+        <span class="text-red-600">日</span>
+        <span class="text-gray-700">月</span>
+        <span class="text-gray-700">火</span>
+        <span class="text-gray-700">水</span>
+        <span class="text-gray-700">木</span>
+        <span class="text-gray-700">金</span>
+        <span class="text-blue-600">土</span>
+      </div>
+      <div id="calGrid" class="grid grid-cols-7 gap-[1px] bg-gray-300 border border-gray-300 text-xs"></div>
+    </div>
+
+    <!-- 3. 右側メイン領域 -->
+    <div class="flex-1 flex flex-col overflow-hidden bg-white">
+
+      <!-- 上部ツールバー -->
+      <header class="h-8 bg-[#e6e6e6] border-b border-gray-300 flex items-center px-2 space-x-1 text-xs select-none">
+        <!-- 放射光データ＆日時・画像 -->
+        <button onclick="SB_InitClick()" title="Insert SR info (放射光条件)" class="h-6 px-1.5 hover:bg-gray-300 rounded flex items-center text-teal-700 font-bold text-sm">⚛️</button>
+        <button onclick="SB_RingCurrentClick()" title="リング電流取得 (OCR)" class="w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded text-xs">💍</button>
+        <button onclick="SB_TimeClick()" title="現在日時を挿入" class="h-6 px-1.5 hover:bg-gray-300 rounded flex items-center text-red-900 font-bold">⏰</button>
+
+        <button onclick="triggerImageCapture()" title="カメラ撮影 / 画像挿入" class="w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded text-xs">📷</button>
+        <input id="cameraInput" type="file" accept="image/*" class="hidden" onchange="handleImageSelected(event)">
+
+        <button onclick="SB_SaveClick(true)" title="ログを保存" class="h-6 px-1.5 hover:bg-gray-300 rounded flex items-center text-gray-700 font-bold">💾</button>
+
+        <div class="w-[2px] h-4 bg-gray-400 mx-1"></div>
+
+        <!-- 書式系 -->
+        <button id="btn_bold" onmousedown="event.preventDefault()" onclick="SB_BoldClick()" title="太字" class="w-6 h-6 flex items-center justify-center font-serif font-bold hover:bg-gray-300 rounded">B</button>
+        <button id="btn_italic" onmousedown="event.preventDefault()" onclick="SB_ItalicClick()" title="斜体" class="w-6 h-6 flex items-center justify-center font-serif italic font-bold hover:bg-gray-300 rounded">I</button>
+        <button id="btn_underline" onmousedown="event.preventDefault()" onclick="SB_UnderLineClick()" title="下線" class="w-6 h-6 flex items-center justify-center underline font-bold hover:bg-gray-300 rounded">U</button>
+        <button id="btn_strike" onmousedown="event.preventDefault()" onclick="SB_StrikeClick()" title="取り消し線" class="w-6 h-6 flex items-center justify-center line-through font-bold hover:bg-gray-300 rounded">S</button>
+
+        <button id="btn_superscript" onmousedown="event.preventDefault()" onclick="SB_SuperScriptClick()" title="上付き文字" class="w-6 h-6 flex items-center justify-center font-mono font-bold hover:bg-gray-300 rounded text-xs text-gray-700">x²</button>
+        <button id="btn_subscript" onmousedown="event.preventDefault()" onclick="SB_SubScriptClick()" title="下付き文字" class="w-6 h-6 flex items-center justify-center font-mono font-bold hover:bg-gray-300 rounded text-xs text-gray-700">x₂</button>
+        
+        <button id="btn_color" onmousedown="event.preventDefault()" onclick="SB_Pen_ColorClick()" title="文字色 (赤/黒)" class="w-6 h-6 flex items-center justify-center text-red-600 font-bold hover:bg-gray-300 rounded">A</button>
+        <button id="btn_highlight" onmousedown="event.preventDefault()" onclick="SB_HighlightClick()" title="マーカー" class="w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded">🖊</button>
+
+        <div class="w-[2px] h-4 bg-gray-400 mx-1"></div>
+
+        <button onmousedown="event.preventDefault()" onclick="SB_ListClick()" title="箇条書き" class="w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded">☰</button>
+        <button onmousedown="event.preventDefault()" onclick="SB_OrderedListClick()" title="番号付きリスト" class="w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded">①</button>
+        <button onmousedown="event.preventDefault()" onclick="toggleBoxWrapper()" title="枠囲み" class="w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded">▭</button>
+
+        <!-- 🎨 イラスト枠挿入 -->
+      <div class="relative inline-block">
+          <button onclick="toggleCanvasInsertPopup(event)" title="イラスト枠挿入" class="w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded">🎨</button>
+          <div id="canvasInsertPopup" class="hidden absolute left-0 top-full mt-1 bg-white border border-gray-300 rounded shadow-xl p-1.5 z-40 flex items-center space-x-1.5 text-xs select-none">
+            <span class="text-[10px] text-gray-500 whitespace-nowrap">行数:</span>
+            <div class="flex items-center space-x-0.5 bg-gray-50 border border-gray-300 rounded px-1">
+              <button type="button" onclick="changeBoxLines(-1)" class="w-4 h-5 flex items-center justify-center text-gray-600 font-bold text-[10px]">◀</button>
+              <input id="box_line_count" type="text" readonly value="10" class="w-5 text-center font-bold font-mono text-xs bg-transparent outline-none">
+              <button type="button" onclick="changeBoxLines(1)" class="w-4 h-5 flex items-center justify-center text-gray-600 font-bold text-[10px]">▶</button>
+            </div>
+            <!-- ★ ここを変更: whitespace-nowrap を追加して折り返しを防ぐ -->
+            <button type="button" onclick="confirmInsertDrawingBox()" class="px-2.5 py-0.5 bg-teal-600 hover:bg-teal-700 text-white rounded text-[10px] font-bold whitespace-nowrap">挿入</button>
+          </div>
+        </div>
+
+        <button onclick="SB_SeparateClick()" title="区切り線" class="w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded">…</button>
+
+        <div class="w-[2px] h-4 bg-gray-400 mx-1"></div>
+
+        <!-- フォントサイズ変更 -->
+        <button onmousedown="event.preventDefault()" onclick="SB_SizeDownClick()" title="Font size down" class="px-1 h-5 flex items-center justify-center hover:bg-gray-300 rounded text-[11px] font-bold text-gray-700">A▼</button>
+        <input id="Edit_Size" type="text" readonly value="12" class="w-7 h-5 text-center bg-[#e9ecef] border border-gray-400 text-[11px] font-bold rounded">
+        <button onmousedown="event.preventDefault()" onclick="SB_SizeUpClick()" title="Font size up" class="px-1 h-5 flex items-center justify-center hover:bg-gray-300 rounded text-[11px] font-bold text-gray-700">A▲</button>
+
+        <div class="flex-1"></div>
+
+        <!-- 👤 アカウント選択 -->
+        <div class="flex items-center space-x-1 mr-2">
+          <span class="text-[11px] text-gray-500 font-bold">👤</span>
+          <select id="sel_account" onchange="handleAccountChange(this.value)" class="h-6 px-1 bg-white border border-gray-400 rounded text-xs font-bold outline-none text-gray-700 cursor-pointer"></select>
+        </div>
+
+        <button id="btn_theme" onmousedown="event.preventDefault()" onclick="toggleDarkMode()" title="Dark mode" class="w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded text-sm">🌓</button>
+      </header>
+
+      <!-- エディタ領域 -->
+      <main class="flex-1 p-4 overflow-y-auto bg-[#fffff7] relative">
+        <div id="editor" contenteditable="true" 
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+          class="w-full h-full min-h-[500px] outline-none leading-relaxed text-gray-900 text-[15px]" 
+          oninput="onEditorInput()"></div>
+
+        <!-- 画像リサイズ枠 ＆ ドラッグ移動 ＆ Fiji起動 ＆ 描画ツールパレット -->
+        <div id="imageResizer" tabindex="-1" class="hidden absolute border-2 border-blue-500 z-20 outline-none select-none">
+          <!-- ✥ ドラッグ移動ハンドル（左上・青丸） -->
+          <div id="dragHandle" title="ドラッグして移動" class="w-5 h-5 bg-blue-600 hover:bg-blue-700 text-white rounded-full absolute -left-2.5 -top-2.5 flex items-center justify-center text-xs shadow cursor-grab active:cursor-grabbing border border-white">✥</div>
+          <!-- 🔬 ImageJ / Fiji 起動ボタン（左上・緑丸） -->
+          <button id="openImageJBtn" title="ImageJ / Fiji で開く" onclick="launchImageJForSelectedImage(event)" class="w-5 h-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full absolute left-3.5 -top-2.5 flex items-center justify-center text-[10px] shadow cursor-pointer border border-white">🔬</button>
+          <!-- ✕ 画像削除ボタン（右上・赤丸） -->
+          <button id="deleteImageBtn" title="画像を削除" class="w-5 h-5 bg-red-600 hover:bg-red-700 text-white rounded-full absolute -right-2.5 -top-2.5 flex items-center justify-center text-[10px] shadow cursor-pointer border border-white">✕</button>
+          <!-- リサイズハンドル（右下） -->
+          <div id="resizeHandle" class="w-3 h-3 bg-blue-600 border border-white absolute -right-1.5 -bottom-1.5 cursor-nwse-resize shadow-sm"></div>
+
+          <!-- 描画サイドパレット -->
+          <div id="drawSidePalette" class="absolute left-full top-0 ml-1.5 bg-white/95 border border-gray-300 rounded-lg shadow-xl p-1.5 z-30 flex flex-col space-y-1.5 text-xs w-[150px] backdrop-blur-sm select-none">
+            <div class="grid grid-cols-6 gap-0.5 border-b border-gray-200 pb-1 text-center font-bold">
+              <button type="button" onclick="selectDrawTool('line')" id="tool_btn_line" class="h-6 flex items-center justify-center hover:bg-gray-100 rounded text-xs" title="直線">╱</button>
+              <button type="button" onclick="selectDrawTool('rect')" id="tool_btn_rect" class="h-6 flex items-center justify-center hover:bg-gray-100 rounded text-xs" title="四角">▭</button>
+              <button type="button" onclick="selectDrawTool('circle')" id="tool_btn_circle" class="h-6 flex items-center justify-center hover:bg-gray-100 rounded text-xs" title="円">◯</button>
+              <button type="button" onclick="selectDrawTool('poly')" id="tool_btn_poly" class="h-6 flex items-center justify-center hover:bg-gray-100 rounded text-xs" title="多角形">⬡</button>
+              <button type="button" onclick="selectDrawTool('pen')" id="tool_btn_pen" class="h-6 flex items-center justify-center hover:bg-gray-100 rounded text-xs" title="手書きペン">✏️</button>
+              <button type="button" onclick="selectDrawTool('text')" id="tool_btn_text" class="h-6 flex items-center justify-center hover:bg-gray-100 rounded text-xs" title="文字">T</button>
+            </div>
+
+            <!-- 線・ペン サブメニュー -->
+            <div id="opt_panel_line" class="space-y-1.5">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] text-gray-500">太さ</span>
+                <input id="line_width" type="range" min="1" max="10" value="2" oninput="updateLineWidthVal(this.value)" class="w-16 h-1 bg-gray-200 rounded cursor-pointer accent-teal-600">
+                <span id="line_width_val" class="font-mono text-[10px] w-3 text-right">2</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] text-gray-500">線種</span>
+                <div class="flex space-x-1">
+                  <button type="button" onclick="setLineDashStyle('solid')" id="btn_dash_solid" class="w-6 h-4 border border-teal-500 bg-teal-50 rounded flex items-center justify-center">―</button>
+                  <button type="button" onclick="setLineDashStyle('dashed')" id="btn_dash_dashed" class="w-6 h-4 border border-gray-300 hover:bg-gray-100 rounded flex items-center justify-center">┄</button>
+                </div>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] text-gray-500">色</span>
+                <input id="line_color" type="color" value="#ef4444" class="w-7 h-4 border border-gray-300 rounded cursor-pointer bg-transparent">
+              </div>
+            </div>
+
+            <!-- 図形・多角形 サブメニュー -->
+            <div id="opt_panel_shape" class="hidden space-y-1.5">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] text-gray-500">線太さ</span>
+                <input id="shape_width" type="range" min="1" max="10" value="2" oninput="updateShapeWidthVal(this.value)" class="w-16 h-1 bg-gray-200 rounded cursor-pointer accent-teal-600">
+                <span id="shape_width_val" class="font-mono text-[10px] w-3 text-right">2</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] text-gray-500">線色</span>
+                <input id="shape_stroke_color" type="color" value="#ef4444" class="w-7 h-4 border border-gray-300 rounded cursor-pointer bg-transparent">
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] text-gray-500">ハッチ</span>
+                <select id="shape_hatch" class="border border-gray-300 rounded text-[10px] px-1 py-0.5 bg-white w-16">
+                  <option value="none">なし</option>
+                  <option value="solid">ベタ</option>
+                  <option value="diagonal">斜線 ╱</option>
+                  <option value="cross">格子 ╳</option>
+                </select>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] text-gray-500">塗色</span>
+                <input id="shape_fill_color" type="color" value="#fca5a5" class="w-7 h-4 border border-gray-300 rounded cursor-pointer bg-transparent">
+              </div>
+            </div>
+
+            <!-- 文字サブメニュー -->
+            <div id="opt_panel_text" class="hidden space-y-1.5">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] text-gray-500">サイズ</span>
+                <input id="text_size_range" type="range" min="8" max="48" value="16" oninput="updateTextSizeVal(this.value)" class="w-16 h-1 bg-gray-200 rounded cursor-pointer accent-teal-600">
+                <span id="text_size_val" class="font-mono text-[10px] w-4 text-right">16</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] text-gray-500">文字色</span>
+                <input id="text_color" type="color" value="#1f2937" class="w-7 h-4 border border-gray-300 rounded cursor-pointer bg-transparent">
+              </div>
+            </div>
+
+            <!-- フッター操作 -->
+            <div class="border-t border-gray-200 pt-1 flex justify-between items-center">
+              <div class="flex space-x-1">
+                <button type="button" onclick="undoLastShape()" title="Undo" class="px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 border rounded text-[10px]">↩</button>
+                <button type="button" onclick="redoLastShape()" title="Redo" class="px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 border rounded text-[10px]">↪</button>
+              </div>
+              <button type="button" onclick="commitDrawing()" class="px-2 py-0.5 bg-teal-600 hover:bg-teal-700 text-white rounded text-[10px] font-bold">✓ 確定</button>
+            </div>
+          </div>
+        </div>
+      </main>
+
+    </div>
+  </div>
+
+  <!-- ステータスバー -->
+  <footer class="h-6 bg-[#5f9ea0] text-white text-[11px] flex items-center px-3 border-t border-gray-400 justify-between select-none">
+    <span id="statusText">Ready</span>
+    <span id="saveStatus" class="text-gray-200">未変更</span>
+  </footer>
+
+  <!-- ⚛️ 放射光データ (SR Info) 入力モーダル -->
+  <div id="modalInit" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center select-none">
+    <div class="bg-[#f0f0f0] border border-gray-400 shadow-2xl rounded p-3 w-[290px] text-xs font-sans text-gray-800">
+      <div class="font-bold border-b border-gray-300 pb-1 mb-2 flex justify-between items-center text-gray-700">
+        <span>⚛️ Init SR Log</span>
+        <button onclick="closeInitModal()" class="text-gray-400 hover:text-gray-600 font-bold px-1">✕</button>
+      </div>
+
+      <div class="space-y-2">
+        <div>
+          <div class="flex justify-between items-center mb-0.5">
+            <label class="font-medium text-gray-700">Facility</label>
+            <select id="sel_facility" onchange="onSelectPreset('facility')" class="w-36 border border-gray-400 bg-white rounded px-1 py-0.5 text-xs outline-none"></select>
+          </div>
+          <input id="init_facility" type="text" placeholder="新規入力 / 選択中" class="w-full border border-gray-300 bg-white rounded px-1.5 py-0.5 text-xs outline-none">
+        </div>
+
+        <div>
+          <div class="flex justify-between items-center mb-0.5">
+            <label class="font-medium text-gray-700">Beamline</label>
+            <select id="sel_beamline" onchange="onSelectPreset('beamline')" class="w-36 border border-gray-400 bg-white rounded px-1 py-0.5 text-xs outline-none"></select>
+          </div>
+          <input id="init_beamline" type="text" placeholder="新規入力 / 選択中" class="w-full border border-gray-300 bg-white rounded px-1.5 py-0.5 text-xs outline-none">
+        </div>
+
+        <div>
+          <div class="flex justify-between items-center mb-0.5">
+            <label class="font-medium text-gray-700">Energy filter</label>
+            <select id="sel_filter" onchange="onSelectPreset('filter')" class="w-36 border border-gray-400 bg-white rounded px-1 py-0.5 text-xs outline-none"></select>
+          </div>
+          <input id="init_filter" type="text" placeholder="新規入力 / 選択中" class="w-full border border-gray-300 bg-white rounded px-1.5 py-0.5 text-xs outline-none">
+        </div>
+
+        <div class="flex justify-between items-center pt-1">
+          <label class="font-medium text-gray-700">Energy [keV]</label>
+          <input id="init_energy" type="text" value="10.0" class="w-36 border border-gray-400 bg-white rounded px-1.5 py-0.5 text-xs outline-none text-right">
+        </div>
+
+        <div>
+          <div class="flex justify-between items-center mb-0.5">
+            <label class="font-medium text-gray-700">Method</label>
+            <select id="sel_method" onchange="onSelectPreset('method')" class="w-36 border border-gray-400 bg-white rounded px-1 py-0.5 text-xs outline-none"></select>
+          </div>
+          <input id="init_method" type="text" placeholder="新規入力 / 選択中" class="w-full border border-gray-300 bg-white rounded px-1.5 py-0.5 text-xs outline-none">
+        </div>
+
+        <div>
+          <div class="flex justify-between items-center mb-0.5">
+            <label class="font-medium text-gray-700">Member</label>
+            <select id="sel_member" onchange="onSelectPreset('member')" class="w-36 border border-gray-400 bg-white rounded px-1 py-0.5 text-xs outline-none"></select>
+          </div>
+          <input id="init_member" type="text" placeholder="新規入力 / 選択中" class="w-full border border-gray-300 bg-white rounded px-1.5 py-0.5 text-xs outline-none">
+        </div>
+      </div>
+
+      <div class="mt-3 pt-2 border-t border-gray-300 flex justify-end space-x-2">
+        <button onclick="closeInitModal()" class="px-3 py-1 bg-gray-200 hover:bg-gray-300 border border-gray-400 rounded text-xs shadow-sm">Cancel</button>
+        <button onclick="insertSRInfo()" class="px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded text-xs shadow-sm">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🔍 ログ検索モーダル -->
+  <div id="modalFind" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center select-none">
+    <div class="bg-[#f0f0f0] border border-gray-400 shadow-2xl rounded w-[430px] h-[460px] overflow-hidden text-xs font-sans text-gray-800 flex flex-col">
+      <div class="h-7 bg-gray-200 border-b border-gray-300 flex items-center justify-between px-2 text-xs select-none">
+        <span class="font-bold text-gray-700">🔍 Find Log</span>
+        <button onclick="closeFindModal()" class="text-gray-400 hover:text-gray-600 font-bold px-1">✕</button>
+      </div>
+
+      <div class="bg-[#e1f6e1] p-2.5 border-b border-gray-300 flex space-x-2">
+        <button onclick="executeSearch()" class="w-16 h-16 bg-white hover:bg-gray-100 border border-gray-400 rounded flex flex-col items-center justify-center shadow-sm font-bold text-gray-700 active:bg-gray-200">
+          <span class="text-lg">🔍</span>
+          <span class="text-[11px] mt-0.5">Search</span>
+        </button>
+
+        <div class="flex-1 space-y-2">
+          <div class="flex items-center space-x-2">
+            <label class="w-14 font-bold text-gray-700">Keyword</label>
+            <input id="find_keyword" type="text" placeholder="検索ワードを入力..." onkeydown="if(event.key==='Enter') executeSearch()" class="flex-1 border border-gray-400 p-1 rounded bg-white text-xs outline-none">
+          </div>
+
+          <div class="space-y-1">
+            <div class="flex items-center space-x-1">
+              <input id="find_use_range" type="checkbox" onchange="toggleDateRangeInputs()" class="rounded border-gray-400">
+              <label for="find_use_range" class="font-bold text-gray-700 cursor-pointer">Date range</label>
+            </div>
+            <div class="flex items-center space-x-1 pl-4">
+              <input id="find_start_date" type="date" disabled class="border border-gray-400 p-0.5 rounded bg-white text-[11px] disabled:bg-gray-200 disabled:text-gray-400 outline-none">
+              <span class="text-gray-500">-</span>
+              <input id="find_end_date" type="date" disabled class="border border-gray-400 p-0.5 rounded bg-white text-[11px] disabled:bg-gray-200 disabled:text-gray-400 outline-none">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex-1 overflow-y-auto bg-white">
+        <table class="w-full text-left border-collapse text-[11px]">
+          <thead class="bg-gray-100 sticky top-0 border-b border-gray-300 text-gray-600 select-none">
+            <tr>
+              <th class="py-1 px-2 border-r border-gray-200 w-20">Date</th>
+              <th class="py-1 px-2 border-r border-gray-200 w-12">Time</th>
+              <th class="py-1 px-2">Log</th>
+            </tr>
+          </thead>
+          <tbody id="findResultList" class="divide-y divide-gray-100 font-mono">
+            <tr>
+              <td colspan="3" class="text-center py-6 text-gray-400 select-none">キーワードを入力してSearchを押してください</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="h-5 bg-gray-200 border-t border-gray-300 px-2 flex items-center justify-between text-[10px] text-gray-600 select-none">
+        <span id="findStatus">0 items</span>
+        <span>ダブルクリックでログを開く</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 👤 新規アカウント作成モーダル -->
+  <div id="modalNewAccount" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center select-none">
+    <div class="bg-white border border-gray-300 shadow-2xl rounded-lg p-4 w-[300px] text-xs">
+      <div class="font-bold border-b pb-1 mb-2">👤 新規アカウント作成</div>
+      <input id="input_new_account" type="text" placeholder="アカウント名 (英数字)" class="w-full border p-1.5 rounded mb-3">
+      <div class="flex justify-end space-x-2">
+        <button onclick="closeNewAccountModal()" class="px-3 py-1 bg-gray-200 rounded">キャンセル</button>
+        <button onclick="submitNewAccount()" class="px-3 py-1 bg-teal-600 text-white rounded font-bold">作成</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⚙️ オプションダイアログ -->
+  <div id="modalOption" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center select-none">
+    <div class="bg-[#f0f0f0] border border-gray-400 shadow-2xl rounded w-[450px] overflow-hidden text-xs font-sans text-gray-800 flex flex-col">
+      <div class="h-7 bg-gray-200 border-b border-gray-300 flex items-center justify-between px-2 text-xs">
+        <span class="font-bold text-gray-700">⚙️ AILab Note Option</span>
+        <button onclick="closeOptionModal()" class="text-gray-400 hover:text-gray-600 font-bold px-1">✕</button>
+      </div>
+
+      <div class="flex border-b border-gray-300 bg-gray-100 px-2 pt-1 space-x-1">
+        <button id="tabBtn_General" onclick="switchOptionTab('General')" class="px-3 py-1 bg-[#eae6ea] border-t border-l border-r border-gray-400 rounded-t font-bold">General</button>
+        <button id="tabBtn_Ring" onclick="switchOptionTab('Ring')" class="px-3 py-1 bg-gray-200 border-b border-gray-300 rounded-t text-gray-600">Ring</button>
+      </div>
+
+      <div class="p-3 bg-[#eae6ea] min-h-[220px]">
+        <!-- General タブ -->
+        <div id="tab_General" class="space-y-3">
+          <!-- 🌟 言語切替設定 -->
+          <div class="border border-gray-400 p-2 rounded bg-white/50 flex items-center justify-between">
+            <label class="font-bold text-gray-700" data-i18n="opt_language">表示言語 (Language)</label>
+            <select id="opt_language" class="border border-gray-400 p-1 rounded bg-white text-xs font-bold outline-none">
+              <option value="ja">日本語 (Japanese)</option>
+              <option value="en">English (US)</option>
+            </select>
+          </div>
+
+          <!-- ImageJ パス -->
+          <div class="border border-gray-400 p-2 rounded bg-white/50">
+            <label class="block font-bold mb-1 text-teal-800">🔬 ImageJ / Fiji Path</label>
+            <div class="flex space-x-1">
+              <input id="opt_imagej_path" type="text" placeholder="/Applications/Fiji.app" class="flex-1 border border-gray-400 p-1 rounded bg-white text-xs outline-none font-mono">
+              <button onclick="pickImageJPath()" title="実行ファイルを選択" class="px-2.5 py-1 bg-gray-200 hover:bg-gray-300 border border-gray-400 rounded text-xs shadow-sm">🔍 参照...</button>
+            </div>
+          </div>
+
+          <!-- 📄 Help File (PDFパス指定) -->
+          <div class="border border-gray-400 p-2 rounded bg-white/50">
+            <label class="block font-bold mb-1 text-gray-700">📄 Help File (PDFパス)</label>
+            <div class="flex space-x-1">
+              <input id="opt_help_file" type="text" placeholder="./AIN2_Manual_JP.pdf" class="flex-1 border border-gray-400 p-1 rounded bg-white text-xs outline-none font-mono">
+              <button onclick="pickHelpFile()" title="PDFファイルを選択" class="px-2.5 py-1 bg-gray-200 hover:bg-gray-300 border border-gray-400 rounded text-xs shadow-sm">📁 参照...</button>
+            </div>
+          </div>          
+
+          <div class="border border-gray-400 p-2 rounded bg-white/50 flex items-center justify-between space-x-2">
+            <div class="flex items-center space-x-1.5 flex-[3]">
+              <span class="font-bold text-gray-700 whitespace-nowrap">Font Size</span>
+              <input id="opt_font_size" type="number" min="7" max="24" value="12" class="w-14 border border-gray-400 p-1 text-center rounded bg-white text-xs">
+            </div>
+            <div class="w-[1px] h-5 bg-gray-300"></div>
+            <div class="flex items-center space-x-1.5 flex-[2] justify-end">
+              <span class="font-bold text-gray-700 whitespace-nowrap">Auto Save</span>
+              <div class="flex items-center space-x-0.5">
+                <input id="opt_auto_save_min" type="number" min="1" max="60" value="5" class="w-12 border border-gray-400 p-1 text-center rounded bg-white text-xs">
+                <span class="text-[11px] text-gray-600">min</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 💾 終了時バックアップ設定 (Dropbox等) -->
+          <div class="border border-gray-400 p-2 rounded bg-white/50 space-y-1.5">
+            <label class="flex items-center space-x-1.5 font-bold text-teal-800 cursor-pointer">
+              <input id="opt_backup_on_exit" type="checkbox" class="rounded border-gray-400">
+              <span data-i18n="opt_backup_on_exit">💾 終了時にフォルダへ差分バックアップ (Dropbox等)</span>
+            </label>
+            <div class="flex space-x-1">
+              <input id="opt_backup_dest_dir" type="text" placeholder="/path/to/backup/AIN2" class="flex-1 border border-gray-400 p-1 rounded bg-white text-xs outline-none font-mono">
+              <button type="button" onclick="pickBackupFolder()" data-i18n="btn_browse_folder" data-i18n-title="tip_select_backup_folder" title="バックアップ先フォルダを選択" class="px-2.5 py-1 bg-gray-200 hover:bg-gray-300 border border-gray-400 rounded text-xs shadow-sm">📁 参照...</button>
+            </div>
+          </div>
+
+
+        </div>
+
+        <!-- Ring タブ -->
+        <div id="tab_Ring" class="hidden space-y-2">
+          <div class="border border-gray-400 p-2 rounded bg-white/50 space-y-2">
+            <div>
+              <label class="block font-bold mb-1 text-teal-800">使用施設 (Active Facility)</label>
+              <select id="opt_ring_facility" class="w-full border border-gray-400 p-1 rounded bg-white text-xs font-bold">
+                <option value="SAGA-LS">SAGA-LS</option>
+                <option value="SPring-8">SPring-8</option>
+                <option value="PF">PF (Photon Factory)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block font-bold mb-0.5 text-gray-700">SAGA-LS Image URL</label>
+              <input id="opt_ring_url_sagals" type="text" class="w-full border border-gray-400 p-1 rounded bg-white text-xs font-mono">
+            </div>
+            <div>
+              <label class="block font-bold mb-0.5 text-gray-700">SPring-8 Image URL</label>
+              <input id="opt_ring_url_spring8" type="text" class="w-full border border-gray-400 p-1 rounded bg-white text-xs font-mono">
+            </div>
+            <div>
+              <label class="block font-bold mb-0.5 text-gray-700">PF Image URL</label>
+              <input id="opt_ring_url_pf" type="text" class="w-full border border-gray-400 p-1 rounded bg-white text-xs font-mono">
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="p-2 border-t border-gray-300 bg-gray-200 flex justify-end space-x-2">
+        <button onclick="closeOptionModal()" class="px-3 py-1 bg-gray-300 hover:bg-gray-400 rounded text-xs border border-gray-400">閉じる</button>
+        <button onclick="saveOptionModal()" class="px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded text-xs shadow-sm">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ℹ️ About (ロゴ表示) モーダル -->
+  <div id="modalAbout" class="hidden fixed inset-0 bg-black/45 z-50 flex items-center justify-center select-none backdrop-blur-[1px]">
+    <div class="bg-white border border-gray-300 shadow-2xl rounded-2xl p-6 w-[360px] text-center font-sans text-gray-800 flex flex-col items-center">
+ 
+      <div class="w-64 mb-3 flex items-center justify-center">
+        <img src="/static/img/AIN2.png" alt="AIN2 Logo" class="w-full h-auto object-contain">
+      </div>
+
+      <div class="font-extrabold text-lg text-gray-900 tracking-tight">AILab_Note (AIN2)</div>
+      <div class="text-[11px] text-teal-700 font-mono font-semibold mb-3">Version 2.3.0 (Modular Edition)</div>
+      <div class="w-full text-xs text-gray-600 py-2.5 px-3 border-y border-gray-200 bg-gray-50/60 rounded-md space-y-1.5 text-left mb-4">
+        <div class="flex justify-between items-center">
+          <span class="text-gray-400 font-medium text-[11px]">Developer:</span>
+          <span class="font-bold text-gray-800">SAGA Light Source</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-gray-400 font-medium text-[11px]">Chief Architect:</span>
+          <span class="font-bold text-gray-800">Akio Yoneyama</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-gray-400 font-medium text-[11px]">AI Partner:</span>
+          <span class="font-medium text-gray-700">Emma, Emu &amp; Eli</span>
+        </div>
+      </div>
+      <div class="w-full flex justify-center space-x-2 border-t border-gray-100 pt-3">
+        <button onclick="openHelpFromAbout()" class="px-3.5 py-1.5 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg text-xs text-gray-700 flex items-center space-x-1">
+          <span>📄</span><span>Help PDF</span>
+        </button>
+        <button onclick="closeAboutModal()" class="px-5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-lg text-xs shadow-sm">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🚪 終了確認モーダル -->
+  <div id="modalQuit" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center select-none backdrop-blur-[1px]">
+    <div class="bg-white border border-gray-300 shadow-2xl rounded-xl p-4 w-[340px] text-xs font-sans text-gray-800 flex flex-col space-y-3">
+      <div class="flex items-center space-x-2 border-b border-gray-200 pb-2">
+        <span class="text-base">🚪</span>
+        <span class="font-bold text-gray-800 text-sm">AIN の終了</span>
+      </div>
+      
+      <p id="quitModalMsg" class="text-gray-600 leading-relaxed">
+        編集中（未保存）のログがあります。<br>どのように終了しますか？
+      </p>
+
+      <div class="flex justify-end space-x-1.5 pt-1">
+        <button type="button" onclick="closeQuitModal()" class="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded text-[11px] font-medium text-gray-700">
+          キャンセル
+        </button>
+        <button type="button" onclick="confirmQuitWithoutSave()" class="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 border border-rose-300 rounded text-[11px] font-bold text-rose-700">
+          破棄して終了
+        </button>
+        <button type="button" onclick="confirmQuitWithSave()" class="px-3 py-1 bg-teal-600 hover:bg-teal-700 rounded text-[11px] font-bold text-white shadow-sm">
+          保存して終了
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+</body>
+</html>

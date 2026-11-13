@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>AIN - Telegram現場連携</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="h-screen flex flex-col bg-slate-50 text-gray-800 text-xs font-sans select-none overflow-hidden">
+
+  <!-- ヘッダー -->
+  <header class="h-9 bg-[#0284c7] text-white flex items-center justify-between px-3 shadow-sm select-none">
+    <div class="flex items-center space-x-2">
+      <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="12" cy="12" r="10" fill="#ffffff" fill-opacity="0.2"/>
+        <path d="M5.5 11.8L17.5 7L14.5 17.5L10.5 13.8L8 15V12.2L14.8 8.8L7.2 12.8L5.5 11.8Z" fill="white"/>
+      </svg>
+      <span id="lbl-header-title" class="font-bold text-sm tracking-wide">Telegram 現場メモ・写真プール</span>
+    </div>
+    <div class="flex items-center space-x-1">
+      <button onclick="toggleConfigPanel()" id="btn-toggle-cfg" title="設定" class="w-7 h-7 flex items-center justify-center hover:bg-white/20 rounded text-sm transition-colors">⚙️</button>
+    </div>
+  </header>
+
+  <!-- サブバー（説明 ＆ 再取得ボタン） -->
+  <div class="bg-sky-50 px-3 py-1.5 border-b border-sky-100 text-[11px] text-sky-800 flex justify-between items-center select-none">
+    <span id="lbl-sub-desc">※ クリックで現在のノート位置へ取り込みます</span>
+    <button onclick="fetchAndRenderCards()" class="hover:text-sky-950 font-bold flex items-center space-x-0.5">
+      <span>🔄</span><span id="lbl-btn-refresh">再取得</span>
+    </button>
+  </div>
+
+  <!-- メイン領域 -->
+  <main class="flex-1 overflow-hidden relative flex flex-col">
+
+    <!-- 1. タイムライン表示ビュー -->
+    <div id="card-list-container" class="flex-1 overflow-y-auto p-3 space-y-2.5 bg-gray-50/50">
+      <div id="loading-msg" class="text-center text-gray-400 py-8">読み込み中...</div>
+    </div>
+
+    <!-- 2. 設定パネル（スライド/トグル） -->
+    <div id="config-panel" class="hidden absolute inset-0 bg-white p-4 flex flex-col space-y-3 z-20">
+      <div class="flex justify-between items-center border-b pb-2">
+        <span id="lbl-cfg-title" class="font-bold text-sm text-gray-800">⚙️ Telegram Bot 設定</span>
+        <button onclick="toggleConfigPanel()" class="text-gray-400 hover:text-gray-600 font-bold text-base">✕</button>
+      </div>
+
+      <div class="space-y-3 flex-1 overflow-y-auto">
+        <div>
+          <label id="lbl-cfg-token" class="block font-bold text-gray-700 mb-1">Bot Token</label>
+          <input id="input_bot_token" type="password" placeholder="55555555555" class="w-full border border-gray-300 p-2 rounded text-xs font-mono outline-none focus:border-sky-500">
+          <span id="lbl-cfg-token-hint" class="text-[10px] text-gray-400 mt-0.5 block">@BotFather から取得したトークン</span>
+        </div>
+
+        <div>
+          <label id="lbl-cfg-users" class="block font-bold text-gray-700 mb-1">Allowed User IDs (カンマ区切り)</label>
+          <input id="input_allowed_ids" type="text" placeholder="12345678, 000000000" class="w-full border border-gray-300 p-2 rounded text-xs font-mono outline-none focus:border-sky-500">
+          <span id="lbl-cfg-users-hint" class="text-[10px] text-gray-400 mt-0.5 block">@userinfobot で確認した数値ID</span>
+        </div>
+      </div>
+
+      <div class="pt-2 border-t flex justify-end space-x-2">
+        <button id="btn-cfg-cancel" onclick="toggleConfigPanel()" class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 rounded font-medium">キャンセル</button>
+        <button id="btn-cfg-save" onclick="saveTelegramConfig()" class="px-4 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded font-bold shadow-sm">保存する</button>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    const API_BASE = window.location.origin + '/api/addin/cop_telegram';
+    let currentCards = [];
+    let currentAccount = "default";
+    let currentLang = 'ja';
+
+    const i18nDict = {
+      ja: {
+        winTitle: "AIN - Telegram現場連携",
+        headerTitle: "Telegram 現場メモ・写真プール",
+        desc: "※ クリックで現在のノート位置へ取り込みます",
+        refresh: "再取得",
+        checking: "過去1週間のメッセージを確認中...",
+        empty: "過去1週間のメッセージはありません",
+        fetchErr: "取得エラー: ",
+        photoOnly: "（写真のみ）",
+        noText: "（テキストなし）",
+        badgeInserted: "✅ 挿入済",
+        badgeNew: "🆕 未取込",
+        cfgTitle: "⚙️ Telegram Bot 設定",
+        tokenLabel: "Bot Token",
+        tokenHint: "@BotFather から取得したトークン",
+        usersLabel: "Allowed User IDs (カンマ区切り)",
+        usersHint: "@userinfobot で確認した数値ID",
+        cancel: "キャンセル",
+        save: "保存する",
+        savedMsg: "設定を保存しました。"
+      },
+      en: {
+        winTitle: "AIN - Telegram Field Sync",
+        headerTitle: "Telegram Field Sync Pool",
+        desc: "※ Click an item to insert it into current notebook.",
+        refresh: "Refresh",
+        checking: "Checking messages from past week...",
+        empty: "No messages found from past week.",
+        fetchErr: "Fetch error: ",
+        photoOnly: "(Photo only)",
+        noText: "(No text)",
+        badgeInserted: "✅ Inserted",
+        badgeNew: "🆕 New",
+        cfgTitle: "⚙️ Telegram Bot Settings",
+        tokenLabel: "Bot Token",
+        tokenHint: "Token obtained from @BotFather",
+        usersLabel: "Allowed User IDs (comma separated)",
+        usersHint: "Numeric IDs checked via @userinfobot",
+        cancel: "Cancel",
+        save: "Save",
+        savedMsg: "Settings saved successfully."
+      }
+    };
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/[&<>"']/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[m]));
+    }
+
+    function applyLang(lang) {
+      currentLang = (lang === 'en') ? 'en' : 'ja';
+      const d = i18nDict[currentLang];
+
+      const hTitle = document.getElementById('lbl-header-title');
+      const sDesc = document.getElementById('lbl-sub-desc');
+      const bRef = document.getElementById('lbl-btn-refresh');
+      const cTitle = document.getElementById('lbl-cfg-title');
+      const cTok = document.getElementById('lbl-cfg-token');
+      const cTokH = document.getElementById('lbl-cfg-token-hint');
+      const cUsr = document.getElementById('lbl-cfg-users');
+      const cUsrH = document.getElementById('lbl-cfg-users-hint');
+      const bCan = document.getElementById('btn-cfg-cancel');
+      const bSav = document.getElementById('btn-cfg-save');
+
+      if (hTitle) hTitle.textContent = d.headerTitle;
+      if (sDesc) sDesc.textContent = d.desc;
+      if (bRef) bRef.textContent = d.refresh;
+      if (cTitle) cTitle.textContent = d.cfgTitle;
+      if (cTok) cTok.textContent = d.tokenLabel;
+      if (cTokH) cTokH.textContent = d.tokenHint;
+      if (cUsr) cUsr.textContent = d.usersLabel;
+      if (cUsrH) cUsrH.textContent = d.usersHint;
+      if (bCan) bCan.textContent = d.cancel;
+      if (bSav) bSav.textContent = d.save;
+
+      document.title = d.winTitle;
+      fetch('/api/set_window_title', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ win_key: 'window_addin_cop_telegram', title: d.winTitle })
+      }).catch(() => {});
+
+      renderCards();
+    }
+
+    async function fetchAndRenderCards() {
+      const d = i18nDict[currentLang];
+      const container = document.getElementById("card-list-container");
+      container.innerHTML = `<div class="text-center text-gray-400 py-8">${d.checking}</div>`;
+
+      try {
+        const res = await fetch(`${API_BASE}/fetch_updates?account=${encodeURIComponent(currentAccount)}`, { method: "POST" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        currentCards = data.cards || [];
+        renderCards();
+      } catch (err) {
+        container.innerHTML = `<div class="text-center text-red-500 py-8">${d.fetchErr}${err.message}</div>`;
+      }
+    }
+
+    function renderCards() {
+      const d = i18nDict[currentLang];
+      const container = document.getElementById("card-list-container");
+      if (!container) return;
+
+      if (currentCards.length === 0) {
+        container.innerHTML = `<div class="text-center text-gray-400 py-8">${d.empty}</div>`;
+        return;
+      }
+
+      container.innerHTML = "";
+      currentCards.forEach(card => {
+        const item = document.createElement("div");
+        item.className = "flex items-start space-x-2.5 p-2.5 bg-white border border-gray-200 hover:border-sky-400 rounded-lg shadow-2xs cursor-pointer transition-colors";
+        
+        if (card.inserted) {
+          item.style.opacity = "0.75";
+          item.style.backgroundColor = "#f8fafc";
+        } else {
+          item.style.borderLeft = "4px solid #0284c7";
+        }
+
+        const thumbHtml = card.type === "photo" 
+          ? `<img src="${card.image_url}" class="w-16 h-16 object-cover rounded shadow-2xs shrink-0">` 
+          : `<div class="w-10 h-10 flex items-center justify-center bg-sky-50 text-sky-600 rounded text-lg shrink-0">📝</div>`;
+
+        const descText = card.text || (card.type === "photo" ? d.photoOnly : d.noText);
+        const badgeHtml = card.inserted 
+          ? `<span class="text-[9px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-normal">${d.badgeInserted}</span>`
+          : `<span class="text-[9px] bg-sky-600 text-white px-1.5 py-0.5 rounded font-bold">${d.badgeNew}</span>`;
+
+        item.innerHTML = `
+          ${thumbHtml}
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] text-gray-500 font-mono">⏰ ${card.timestamp_str}</span>
+              ${badgeHtml}
+            </div>
+            <div class="text-gray-800 text-xs mt-1 line-clamp-2 leading-relaxed">${escapeHtml(descText)}</div>
+          </div>
+        `;
+        
+        item.onclick = () => insertCardToNotebook(card);
+        container.appendChild(item);
+      });
+    }
+
+    // 🌟 汎用ブリッジ経由でメインノートへHTMLを送信
+    async function insertCardToNotebook(card) {
+      let html = '';
+      if (card.type === "photo") {
+        html = `
+          <div style="margin:8px 0;">
+            <img src="${card.image_url}" style="width:380px; max-width:100%; display:block; border-radius:4px;" class="resizable-img rounded shadow-sm" />
+            <div style="font-size:11px; color:#64748b; font-family:monospace; margin-top:2px;">
+              📷 [${card.timestamp_str}] ${card.text ? `📌 ${escapeHtml(card.text)}` : ""}
+            </div>
+          </div>
+          <div><br></div>
+        `;
+      } else {
+        html = `
+          <div style="margin:4px 0; font-size:13px; color:#1e293b;">
+            📝 [${card.timestamp_str}] ${escapeHtml(card.text)}
+          </div>
+          <div><br></div>
+        `;
+      }
+
+      const bridge = new BroadcastChannel('ain_addin_bridge');
+      bridge.postMessage({ action: 'insert_html', html: html });
+
+      // 取り込み済みにマーク
+      try {
+        await fetch(`${API_BASE}/mark_inserted`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ msg_id: card.msg_id, account: currentAccount })
+        });
+        card.inserted = true;
+        renderCards();
+      } catch (e) {
+        console.warn("マーク失敗", e);
+      }
+    }
+
+    // 設定パネルの開閉
+    async function toggleConfigPanel() {
+      const panel = document.getElementById("config-panel");
+      panel.classList.toggle("hidden");
+      if (!panel.classList.contains("hidden")) {
+        try {
+          const res = await fetch(`${API_BASE}/config?account=${encodeURIComponent(currentAccount)}`);
+          const data = await res.json();
+          const cfg = data.config || {};
+          document.getElementById("input_bot_token").value = cfg.bot_token || "";
+          document.getElementById("input_allowed_ids").value = cfg.allowed_ids || "";
+        } catch (e) {
+          console.error("設定読み込み失敗", e);
+        }
+      }
+    }
+
+    async function saveTelegramConfig() {
+      const d = i18nDict[currentLang];
+      const botToken = document.getElementById("input_bot_token").value.trim();
+      const allowedIds = document.getElementById("input_allowed_ids").value.trim();
+
+      try {
+        await fetch(`${API_BASE}/config`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bot_token: botToken, allowed_ids: allowedIds, account: currentAccount })
+        });
+        alert(d.savedMsg);
+        toggleConfigPanel();
+        fetchAndRenderCards();
+      } catch (e) {
+        alert("Save failed: " + e.message);
+      }
+    }
+
+    // 言語ブロードキャスト
+    const i18nChannel = new BroadcastChannel('ain_i18n_channel');
+    i18nChannel.onmessage = (e) => {
+      if (e.data && e.data.action === 'change_lang') {
+        applyLang(e.data.lang || e.data.language);
+      }
+    };
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      try {
+        const res = await fetch('/api/config');
+        const cfg = await res.json();
+        currentAccount = cfg.account_name || "default";
+        applyLang(cfg.language || 'ja');
+      } catch (e) {
+        applyLang('ja');
+      }
+      fetchAndRenderCards();
+    });
+  </script>
+</body>
+</html>
