@@ -52,7 +52,7 @@ AIN2/
 ### macOS
 1. Clone this repository:
    ```bash
-   git clone https://github.com/<your-username>/AIN2.git
+   git clone https://github.com/SAGALS-IMG/AIN2.git
    cd AIN2
    ```
 2. Run the automated installer (creates the `ain2` Conda environment and a Desktop shortcut):
@@ -68,7 +68,7 @@ AIN2/
 ### Windows 11
 1. Clone this repository:
    ```bash
-   git clone https://github.com/<your-username>/AIN2.git
+   git clone https://github.com/SAGALS-IMG/AIN2.git
    cd AIN2
    ```
 2. Double-click `install_win.bat` (or run it in Command Prompt) to set up the environment and create a Desktop shortcut, or install manually:

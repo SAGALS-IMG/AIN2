@@ -52,7 +52,7 @@ AIN2/
 ### macOS の場合
 1. リポジトリをクローンします：
    ```bash
-   git clone https://github.com/<your-username>/AIN2.git
+   git clone https://github.com/SAGALS-IMG/AIN2.git
    cd AIN2
    ```
 2. 自動インストーラを実行します（仮想環境 `ain2` とデスクトップショートカットを作成します）：
@@ -68,7 +68,7 @@ AIN2/
 ### Windows 11 の場合
 1. リポジトリをクローンします：
    ```bash
-   git clone https://github.com/<your-username>/AIN2.git
+   git clone https://github.com/SAGALS-IMG/AIN2.git
    cd AIN2
    ```
 2. `install_win.bat` をダブルクリック（またはコマンドプロンプトから実行）して環境構築とショートカット作成を行うか、手動で起動します：
