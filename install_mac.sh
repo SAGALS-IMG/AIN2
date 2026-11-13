@@ -41,6 +41,7 @@ if [ -z "$CONDA_EXE" ]; then
 fi
 
 echo "--> Conda 準備完了: ${CONDA_EXE}"
+export CONDA_PLUGINS_AUTO_ACCEPT_TOS=yes
 CONDA_BASE="$("$CONDA_EXE" info --base)"
 source "${CONDA_BASE}/etc/profile.d/conda.sh"
 
@@ -48,7 +49,7 @@ source "${CONDA_BASE}/etc/profile.d/conda.sh"
 ENV_NAME="ain2"
 if ! conda info --envs | grep -q "^${ENV_NAME} "; then
   echo "--> 仮想環境 '${ENV_NAME}' (Python 3.11) を作成中..."
-  conda create -y -n "${ENV_NAME}" python=3.11
+  conda create -y -n "${ENV_NAME}" --override-channels -c conda-forge python=3.11
 fi
 conda activate "${ENV_NAME}"
 
@@ -61,11 +62,11 @@ if [ -f "requirements.txt" ]; then
   pip install -r requirements.txt
 fi
 
-conda install -c conda-forge xraylib -y
+conda install -y --override-channels -c conda-forge xraylib tesseract
 
 mkdir -p tmp_imagej Log/default
 
-# 5. デスクトップショートカット生成（重複を削除し1回のみ生成）
+# 5. デスクトップショートカット生成
 DESKTOP_SHORTCUT="$HOME/Desktop/AIN2.command"
 cat << 'EOF' > "$DESKTOP_SHORTCUT"
 #!/bin/bash
