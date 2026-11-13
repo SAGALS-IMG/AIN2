@@ -38,7 +38,7 @@
 
     /* 🌟 index.html と同等のトグルアクティブスタイル */
     .btn-active {
-      background-color: #cbd5e1 !important; /* Tailwind slate-300 */
+      background-color: #cbd5e1 !important;
       box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25) !important;
     }
 
@@ -61,7 +61,7 @@
 </head>
 <body class="h-screen flex flex-col bg-[#eef4ee] font-sans select-none overflow-hidden text-gray-800">
 
-<!-- ツールバー (index.html と同一トーン) -->
+  <!-- ツールバー (index.html と同一トーン) -->
   <header class="h-8 bg-[#e6e6e6] border-b border-gray-300 flex items-center px-2 space-x-1 select-none text-xs">
     <!-- アクション系（アイコン） -->
     <button onclick="insertMemoTime()" title="現在日時を挿入" class="w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded text-gray-700 transition-colors">⏰</button>
@@ -83,10 +83,9 @@
 
     <div class="h-4 w-px bg-gray-400 mx-1"></div>
 
-    <!-- ★ ここから追加：箇条書きと番号リスト -->
-    <button onmousedown="event.preventDefault()" onclick="applyUnorderedList()" data-hint="箇条書きリスト (・)" class="w-6 h-6 flex items-center justify-center hover:bg-gray-200 rounded font-bold text-xs text-gray-700">☰</button>
-    <button onmousedown="event.preventDefault()" onclick="applyOrderedList()" data-hint="番号付きリスト (1. 2. 3.)" class="w-6 h-6 flex items-center justify-center hover:bg-gray-200 rounded font-bold text-xs text-gray-700">①</button>
-    <!-- ★ ここまで -->
+    <!-- 箇条書きと番号リスト -->
+    <button onmousedown="event.preventDefault()" onclick="applyUnorderedList()" data-hint="箇条書きリスト (・)" title="箇条書きリスト (・)" class="w-6 h-6 flex items-center justify-center hover:bg-gray-200 rounded font-bold text-xs text-gray-700">☰</button>
+    <button onmousedown="event.preventDefault()" onclick="applyOrderedList()" data-hint="番号付きリスト (1. 2. 3.)" title="番号付きリスト (1. 2. 3.)" class="w-6 h-6 flex items-center justify-center hover:bg-gray-200 rounded font-bold text-xs text-gray-700">①</button>
 
     <div class="flex-1"></div>
     <span id="memoSaveStatus" class="text-[11px] text-gray-500">自動保存 (10s)</span>
@@ -109,7 +108,7 @@
     let isMemoModified = false;
 
     // ダークモード復元
-    if (localStorage.getItem('ailab_theme_dark') === 'true') {
+    if (localStorage.getItem('ain2_theme_dark') === 'true' || localStorage.getItem('ailab_theme_dark') === 'true') {
       document.body.classList.add('dark-mode');
     }
 
@@ -129,7 +128,6 @@
         const editor = document.getElementById('memoEditor');
         editor.innerHTML = data.content_html || "";
         
-        // 🌟 言語に応じたステータス表示
         const isEn = (currentAppLanguage === "en");
         document.getElementById('memoStatusText').textContent = data.exists 
           ? (isEn ? "Loaded (backup created)" : "Loaded (.orig退避済)") 
@@ -197,19 +195,15 @@
         setBtnActive('btn_strike', document.queryCommandState('strikeThrough'));
         setBtnActive('btn_list', document.queryCommandState('insertUnorderedList'));
 
-        // 赤色判定：foreColor の戻り値（rgb(239, 68, 68) や #ef4444 など）をチェック
         const colorVal = document.queryCommandValue('foreColor') || '';
         const isRed = colorVal.includes('239, 68, 68') || 
                       colorVal.includes('255, 0, 0') || 
                       colorVal.toLowerCase() === '#ef4444' || 
                       colorVal.toLowerCase() === 'red';
         setBtnActive('btn_color', isRed);
-      } catch (e) {
-        // フォーカスが外れている時などは無視
-      }
+      } catch (e) {}
     }
 
-    // キャレット移動・選択範囲変更のイベントを監視
     document.addEventListener('selectionchange', () => {
       const sel = window.getSelection();
       if (!sel || !sel.rangeCount) return;
@@ -224,7 +218,7 @@
     memoEditor.addEventListener('mouseup', updateToolbarState);
 
     // ==========================================
-    // 装飾実行関数
+    // 装飾・挿入実行関数
     // ==========================================
     function execMemoFormat(command, value = null) {
       memoEditor.focus();
@@ -233,7 +227,6 @@
       updateToolbarState();
     }
 
-    // 赤色トグル（すでに赤なら通常色に戻し、黒なら赤にする）
     function toggleMemoRedColor() {
       memoEditor.focus();
       const colorVal = document.queryCommandValue('foreColor') || '';
@@ -243,26 +236,43 @@
                     colorVal.toLowerCase() === 'red';
       
       if (isRed) {
-        document.execCommand('foreColor', false, '#1f2937'); // 通常テキスト色
+        document.execCommand('foreColor', false, '#1f2937');
       } else {
-        document.execCommand('foreColor', false, '#ef4444'); // 赤色
+        document.execCommand('foreColor', false, '#ef4444');
       }
       onMemoInput();
       updateToolbarState();
     }
 
-    // 箇条書き（黒丸リスト）
+    function insertMemoTime() {
+      memoEditor.focus();
+      const now = new Date();
+      const y = now.getFullYear();
+      const mo = String(now.getMonth() + 1).padStart(2, '0');
+      const d = String(now.getDate()).padStart(2, '0');
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      document.execCommand('insertText', false, `[${y}/${mo}/${d} ${h}:${m}] `);
+      onMemoInput();
+    }
+
+    function insertMemoCheck() {
+      memoEditor.focus();
+      document.execCommand('insertText', false, '✅ ');
+      onMemoInput();
+    }
+
     function applyUnorderedList() {
+      memoEditor.focus();
       document.execCommand('insertUnorderedList', false, null);
-      editor.focus();
+      onMemoInput();
     }
 
-    // 番号付きリスト（1. 2. 3. ...）
     function applyOrderedList() {
+      memoEditor.focus();
       document.execCommand('insertOrderedList', false, null);
-      editor.focus();
+      onMemoInput();
     }
-
 
     // ウィンドウ位置・サイズの記憶
     function saveWindowBounds() {
