@@ -61,6 +61,8 @@ if [ -f "requirements.txt" ]; then
   pip install -r requirements.txt
 fi
 
+conda install -c conda-forge xraylib -y
+
 mkdir -p tmp_imagej Log/default
 
 # 5. デスクトップショートカット生成（重複を削除し1回のみ生成）

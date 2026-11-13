@@ -73,6 +73,8 @@ call pip install fastapi "uvicorn[standard]" pydantic opencv-python-headless num
 if exist "requirements.txt" (
     call pip install -r requirements.txt
 )
+conda install -c conda-forge xraylib -y
+
 
 if not exist "tmp_imagej" mkdir "tmp_imagej"
 if not exist "Log\default" mkdir "Log\default"
