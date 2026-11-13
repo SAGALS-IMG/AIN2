@@ -1127,9 +1127,9 @@ async function openOptionModal() {
 
     // Ring
     document.getElementById('opt_ring_facility').value = cfg.ring_facility || 'SAGA-LS';
-    document.getElementById('opt_ring_url_sagals').value = cfg.ring_url_sagals || '[https://www.saga-ls.jp/acc/accstatus.jpg](https://www.saga-ls.jp/acc/accstatus.jpg)';
-    document.getElementById('opt_ring_url_spring8').value = cfg.ring_url_spring8 || '[https://spring8.jp/status/sr_status_en.png](https://spring8.jp/status/sr_status_en.png)';
-    document.getElementById('opt_ring_url_pf').value = cfg.ring_url_pf || '[https://www-pfring.kek.jp/PF/status/pf_status.png](https://www-pfring.kek.jp/PF/status/pf_status.png)';
+    document.getElementById('opt_ring_url_sagals').value = cfg.ring_url_sagals || 'https://www.saga-ls.jp/acc/accstatus.jpg';
+    document.getElementById('opt_ring_url_spring8').value = cfg.ring_url_spring8 || 'https://spring8.jp/status/sr_status_en.png';
+    document.getElementById('opt_ring_url_pf').value = cfg.ring_url_pf || 'https://www-pfring.kek.jp/PF/status/pf_status.png';
 
   } catch (e) {
     console.warn("Config load failed", e);
@@ -1502,7 +1502,7 @@ window.addEventListener('DOMContentLoaded', () => {
       }
     });
 
-    window.addEventListener('mouseup', () => {
+    window.addEventListener('mouseup', (e) => {
       if (!isMovingImage || !movingBlockElem) return;
       isMovingImage = false;
       document.body.style.userSelect = '';
