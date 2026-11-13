@@ -205,7 +205,7 @@
       </div>
 
       <p id="lbl-rag-desc" class="text-xs text-gray-600 leading-relaxed mb-3">
-        現在のアカウント（<b id="eli-rag-target-account" class="font-mono text-gray-700"></b>）の <code>elog/</code> を元に、MacローカルのChromaDBへ知識ベースを構築・更新します。
+        現在のアカウント（<b id="eli-rag-target-account" class="font-mono text-gray-700"></b>）の <code>elog/</code> を元に、ローカルのChromaDBへ知識ベースを構築・更新します。
       </p>
 
       <div class="flex items-center justify-end space-x-2 pt-3 border-t border-purple-200">
@@ -677,7 +677,7 @@ let currentLang = 'ja';
       if (ragDesc) {
         ragDesc.innerHTML = isEn
           ? `Build and update local knowledge base in ChromaDB based on <code>elog/</code> of the current account (<b id="eli-rag-target-account" class="font-mono text-gray-700">${escapeHtml(currentAccount)}</b>).`
-          : `現在のアカウント（<b id="eli-rag-target-account" class="font-mono text-gray-700">${escapeHtml(currentAccount)}</b>）の <code>elog/</code> を元に、MacローカルのChromaDBへ知識ベースを構築・更新します。`;
+          : `現在のアカウント（<b id="eli-rag-target-account" class="font-mono text-gray-700">${escapeHtml(currentAccount)}</b>）の <code>elog/</code> を元に、ローカルのChromaDBへ知識ベースを構築・更新します。`;
       }
       const monUnit = document.getElementById('lbl-rag-mon-unit');
       if (monUnit) monUnit.textContent = isEn ? "files" : "件";
@@ -801,15 +801,15 @@ let currentLang = 'ja';
       const alertDetail = document.getElementById('ai-connection-detail');
       const sendBtn = document.getElementById('ai-send-btn');
       const input = document.getElementById('ai-input-message');
+      const isEn = (currentLang === "en");
 
       badge.className = "ml-2 text-[10px] px-2 py-0.5 rounded font-normal bg-amber-600 text-white animate-pulse";
-      badge.textContent = "確認中...";
+      badge.textContent = isEn ? "Checking..." : "確認中...";
       alertBox.classList.add('hidden');
 
       try {
         const res = await fetch(`${API_ADDIN}/ai/health?account=${encodeURIComponent(currentAccount)}`);
         const data = await res.json();
-        const isEn = (typeof currentAppLanguage !== "undefined" && currentAppLanguage === "en");
         if (data.status === "ok") {
           badge.className = "ml-2 text-[10px] px-2 py-0.5 rounded font-normal bg-emerald-600 text-white";
           badge.textContent = isEn ? "🟢 Online" : "🟢 オンライン";
@@ -819,7 +819,6 @@ let currentLang = 'ja';
           throw new Error(data.error || "応答なし");
         }
       } catch (err) {
-        const isEn = (typeof currentAppLanguage !== "undefined" && currentAppLanguage === "en");
         badge.className = "ml-2 text-[10px] px-2 py-0.5 rounded font-normal bg-rose-600 text-white";
         badge.textContent = isEn ? "🔴 Offline" : "🔴 オフライン";
         alertDetail.textContent = err.message;
@@ -837,7 +836,7 @@ let currentLang = 'ja';
       }
     }
 
-async function sendAIChatMessage() {
+    async function sendAIChatMessage() {
       const input = document.getElementById('ai-input-message');
       const text = input.value.trim();
       if (!text) return;
@@ -1340,11 +1339,12 @@ async function sendAIChatMessage() {
         filesList.sort().reverse();
 
         const chunkCount = typeof data.chunk_count === "number" ? data.chunk_count : 0;
-        const isEn = (typeof currentAppLanguage !== "undefined" && currentAppLanguage === "en");
+        const isEn = (currentLang === "en");
 
         if (countBadge) {
           countBadge.textContent = isEn ? `${chunkCount} chunks indexed` : `${chunkCount} チャンク登録済`;
         }
+     
         if (monitorCount) monitorCount.textContent = filesList.length;
         if (filesBadge) filesBadge.textContent = `${filesList.length} files`;
 
@@ -1372,8 +1372,12 @@ async function sendAIChatMessage() {
       }
     }
 
-    async function runRagRebuildAll() {
-      if (!confirm("既存のインデックスを初期化し、全 eLog から RAG を完全に再構築します。\n実行しますか？")) {
+async function runRagRebuildAll() {
+      const isEn = (currentLang === "en");
+      const confirmMsg = isEn
+        ? "This will reset the existing index and completely rebuild RAG from all eLogs.\nDo you want to proceed?"
+        : "既存のインデックスを初期化し、全 eLog から RAG を完全に再構築します。\n実行しますか？";
+      if (!confirm(confirmMsg)) {
         return;
       }
 
@@ -1384,11 +1388,15 @@ async function sendAIChatMessage() {
       const barTimer = document.getElementById('eliTimerText');
 
       btn.disabled = true;
-      btn.innerHTML = `<span>⏳</span> 再構築中...`;
-      statusMsg.textContent = "全 eLog を解析して ChromaDB を再構築しています...";
+      btn.innerHTML = isEn ? `<span>⏳</span> Rebuilding...` : `<span>⏳</span> 再構築中...`;
+      statusMsg.textContent = isEn
+        ? "Analyzing all eLogs and rebuilding ChromaDB..."
+        : "全 eLog を解析して ChromaDB を再構築しています...";
       statusMsg.className = "text-xs text-purple-600 font-mono animate-pulse";
 
-      barText.textContent = "EliがローカルRAGを全再構築中...";
+      barText.textContent = isEn
+        ? "Eli is rebuilding local RAG..."
+        : "EliがローカルRAGを全再構築中...";
       barDot.className = "w-2 h-2 rounded-full bg-amber-400 animate-ping";
 
       const startTime = performance.now();
@@ -1414,36 +1422,42 @@ async function sendAIChatMessage() {
 
         clearInterval(formatTimerId);
         const finalSec = ((performance.now() - startTime) / 1000).toFixed(1);
-        barTimer.textContent = `⏱ ${finalSec}s (完了)`;
+        barTimer.textContent = isEn ? `⏱ ${finalSec}s (Done)` : `⏱ ${finalSec}s (完了)`;
         barText.textContent = "Ready";
         barDot.className = "w-2 h-2 rounded-full bg-emerald-400";
 
-        statusMsg.textContent = `✅ 完了: ${data.total_files} ファイル (${data.total_chunks} チャンク) を再構築しました`;
+        statusMsg.textContent = isEn
+          ? `✅ Done: Rebuilt ${data.total_files} files (${data.total_chunks} chunks)`
+          : `✅ 完了: ${data.total_files} ファイル (${data.total_chunks} チャンク) を再構築しました`;
         statusMsg.className = "text-xs text-emerald-600 font-bold font-mono";
 
         await fetchEliRagStatus();
-        alert(`【RAG 全再構築 完了】\n\n処理時間: ${finalSec} 秒\n対象ファイル数: ${data.total_files} 件\n登録チャンク数: ${data.total_chunks} 件\n\n日付見出し付きの新しいインデックスが作成されました。`);
+        const msgRebuild = isEn
+          ? `[RAG Clean Rebuild Complete]\n\nElapsed: ${finalSec} sec\nIndexed Files: ${data.total_files}\nIndexed Chunks: ${data.total_chunks}`
+          : `【RAG 全再構築 完了】\n\n処理時間: ${finalSec} 秒\n対象ファイル数: ${data.total_files} 件\n登録チャンク数: ${data.total_chunks} 件\n\n日付見出し付きの新しいインデックスが作成されました。`;
+        alert(msgRebuild);
 
       } catch (err) {
         clearInterval(formatTimerId);
         const errSec = ((performance.now() - startTime) / 1000).toFixed(1);
-        barTimer.textContent = `⏱ ${errSec}s (中断)`;
-        barText.textContent = `再構築失敗: ${err.message}`;
+        barTimer.textContent = isEn ? `⏱ ${errSec}s (Aborted)` : `⏱ ${errSec}s (中断)`;
+        barText.textContent = isEn ? `Rebuild failed: ${err.message}` : `再構築失敗: ${err.message}`;
         barDot.className = "w-2 h-2 rounded-full bg-rose-500";
 
-        statusMsg.textContent = `⚠️ エラー: ${err.message}`;
+        statusMsg.textContent = isEn ? `⚠️ Error: ${err.message}` : `⚠️ エラー: ${err.message}`;
         statusMsg.className = "text-xs text-rose-600 font-bold font-mono";
-        alert("RAG 全再構築エラー:\n" + err.message);
+        alert((isEn ? "RAG Rebuild Error:\n" : "RAG 全再構築エラー:\n") + err.message);
 
       } finally {
         btn.disabled = false;
-        btn.innerHTML = `<span>⚠️</span> 全再構築 (クリーン)`;
+        btn.innerHTML = isEn ? `<span>⚠️</span> Clean Rebuild All` : `<span>⚠️</span> 全再構築 (クリーン)`;
       }
     }
 
     async function runRagSyncDiff() {
+      const isEn = (currentLang === "en");
       if (!activeDateStr) {
-        alert("同期対象のログ日付が選択されていません。");
+        alert(isEn ? "No target log date selected for sync." : "同期対象のログ日付が選択されていません。");
         return;
       }
 
@@ -1454,8 +1468,10 @@ async function sendAIChatMessage() {
       const barTimer = document.getElementById('eliTimerText');
 
       btn.disabled = true;
-      btn.innerHTML = `<span>⏳</span> 同期中...`;
-      barText.textContent = `Eliが ${activeDateStr} のログをRAGへ差分同期中...`;
+      btn.innerHTML = isEn ? `<span>⏳</span> Syncing...` : `<span>⏳</span> 同期中...`;
+      barText.textContent = isEn
+        ? `Eli is syncing ${activeDateStr} log to RAG...`
+        : `Eliが ${activeDateStr} のログをRAGへ差分同期中...`;
       barDot.className = "w-2 h-2 rounded-full bg-amber-400 animate-ping";
 
       const startTime = performance.now();
@@ -1474,27 +1490,31 @@ async function sendAIChatMessage() {
           body: JSON.stringify({ date_str: activeDateStr, account: acc })
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || "同期失敗");
+        if (!res.ok) throw new Error(data.detail || (isEn ? "Sync failed" : "同期失敗"));
 
         clearInterval(formatTimerId);
         const finalSec = ((performance.now() - startTime) / 1000).toFixed(1);
-        barTimer.textContent = `⏱ ${finalSec}s (完了)`;
+        barTimer.textContent = isEn ? `⏱ ${finalSec}s (Done)` : `⏱ ${finalSec}s (完了)`;
         barText.textContent = "Ready";
         barDot.className = "w-2 h-2 rounded-full bg-emerald-400";
 
-        statusMsg.textContent = `✅ ${activeDateStr} を登録しました (${data.indexed_chunks || 0} チャンク)`;
+        statusMsg.textContent = isEn
+          ? `✅ Indexed ${activeDateStr} (${data.indexed_chunks || 0} chunks)`
+          : `✅ ${activeDateStr} を登録しました (${data.indexed_chunks || 0} チャンク)`;
         statusMsg.className = "text-xs text-emerald-600 font-bold font-mono";
         await fetchEliRagStatus();
-        alert(`${activeDateStr} の差分登録が完了しました。`);
+        alert(isEn
+          ? `Differential sync for ${activeDateStr} completed.`
+          : `${activeDateStr} の差分登録が完了しました。`);
 
       } catch (err) {
         clearInterval(formatTimerId);
-        barText.textContent = "同期失敗";
+        barText.textContent = isEn ? "Sync failed" : "同期失敗";
         barDot.className = "w-2 h-2 rounded-full bg-rose-500";
-        alert("差分同期エラー:\n" + err.message);
+        alert((isEn ? "Differential Sync Error:\n" : "差分同期エラー:\n") + err.message);
       } finally {
         btn.disabled = false;
-        btn.innerHTML = `<span>➕</span> 新規elogを差分追加`;
+        btn.innerHTML = isEn ? `<span>➕</span> Add New eLog (Diff)` : `<span>➕</span> 新規elogを差分追加`;
       }
     }
 

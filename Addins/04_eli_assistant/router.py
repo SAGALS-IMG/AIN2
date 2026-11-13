@@ -92,9 +92,13 @@ def save_config_api(cfg: dict, account: Optional[str] = None):
 
 @router.post("/ai/models")
 def fetch_ai_models_endpoint(payload: dict):
-    base_url = payload.get("url", "http://localhost:8001").rstrip("/")
+    base_url = payload.get("url", "http://localhost:8001").strip().rstrip("/")
     is_vllm = payload.get("is_vllm", True)
     api_key = payload.get("api_key", "").strip()
+
+    parsed = urllib.parse.urlparse(base_url)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return {"error": "Invalid URL scheme (only http/https allowed)", "models": []}
 
     if "googleapis.com" in base_url:
         endpoint = "https://generativelanguage.googleapis.com/v1beta/openai/models"
