@@ -4,6 +4,8 @@ from pathlib import Path
 from fastapi import APIRouter
 from pydantic import BaseModel
 from core.config import BASE_DIR, get_app_state
+import os
+import subprocess
 
 router = APIRouter()
 
@@ -42,12 +44,15 @@ def save_links(data: LinksData, account: str = None):
         json.dump(data.links, fp, ensure_ascii=False, indent=2)
     return {"status": "ok"}
 
-# ★★★ ここを追加: OS標準ブラウザでURLを開く ★★★
+# OS標準ブラウザでURLを開く（Windows / Mac 確実対応版）
 @router.post("/open_browser")
 def open_in_browser(payload: OpenUrlPayload):
     target = payload.url.strip()
     if target:
         if not target.startswith("http://") and not target.startswith("https://"):
             target = "https://" + target
-        webbrowser.open(target)
+        if os.name == "nt":
+            subprocess.Popen(["rundll32.exe", "url.dll,FileProtocolHandler", target])
+        else:
+            webbrowser.open(target)
     return {"status": "ok"}
