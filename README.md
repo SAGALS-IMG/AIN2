@@ -99,3 +99,14 @@ This project is licensed under the **Apache License 2.0** — see the [LICENSE](
 
 Copyright (c) 2026 **SAGA Light Source (SAGA-LS)**  
 Developed by **Akio Yoneyama** (SAGA-LS).
+
+## v2.3.1 (2026-11-14)
+- **Multi-Protocol Ring Current Acquisition / 蓄積リング電流取得の高度化**:
+  - Added support for arbitrary facility additions alongside the fixed `SAGA-LS` default (`SAGA-LS` 基準固定 ＋ 任意施設の無制限追加に対応).
+  - Supported direct JSON/text parsing (e.g., `NanoTerasu` `datafile.json`) in addition to image-based OCR (`NanoTerasu` 等のJSON/テキスト形式のデータ取得と画像OCRの自動判別に対応).
+- **3-System Color Palettes / 3系統カラーパレットの実装**:
+  - Added customizable color palettes and real-time toolbar indicators for Text (`A`), Highlight (`🖊`), and Callout Box (`▭`) borders/backgrounds (文字色・マーカー・ボックス色のカラーパレットとカーソル連動インジケーターを追加).
+- **Account Avatar Badge / アカウント識別バッジ**:
+  - Replaced the generic user icon with a color-coded initial badge for quick profile identification (アカウント頭文字と自動配色によるアバターバッジを導入).
+- **Documentation / マニュアル更新**:
+  - Updated JP/EN manuals to Version 2.3.1 (日英マニュアルを v2.3.1 に更新).
