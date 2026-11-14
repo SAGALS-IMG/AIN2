@@ -33,7 +33,7 @@ from core.config import (
 from core.addin_loader import init_addins
 from routers import logs, tools, imagej
 
-app = FastAPI(title="AILab_Note (AIN2)", version="2.0.0")
+app = FastAPI(title="AILab_Note (AIN2)", version="2.3.1")
 
 # CORS設定
 app.add_middleware(
@@ -97,7 +97,6 @@ def acquire_single_instance_lock():
 # 起動直後に排他ロックを実行
 acquire_single_instance_lock()
 
-
 def release_single_instance_lock():
     global lock_file_handle
     try:
@@ -141,7 +140,7 @@ def read_calc_page():
 
 @app.get("/logo")
 def get_logo():
-    logo_path = STATIC_DIR / "img" / "AIN2.png"
+    logo_path = STATIC_DIR / "img" / "SAGA_LS.png"
     if logo_path.exists():
         return FileResponse(logo_path, media_type="image/png")
     return JSONResponse(status_code=404, content={"error": "Logo not found"})
@@ -483,7 +482,7 @@ def sync_logs_with_or_merge(local_log_root: Path, remote_log_root: Path):
 
 
 def run_exit_backup():
-    """設定が有効な場合、ローカルのAIN2一式をDropbox等へ差分バックアップ（ログはOR統合）する"""
+    """設定が有効な場合、バックアップを実行する（隠しファイル .ain_full_backup がある場合は全ソースも同期）"""
     global _exit_backup_done
     if _exit_backup_done:
         return
@@ -505,42 +504,47 @@ def run_exit_backup():
             return
 
         dest_path.mkdir(parents=True, exist_ok=True)
-        src = str(BASE_DIR).rstrip("/") + "/"
-        dst = str(dest_path).rstrip("/") + "/"
 
-        # 1. Log/ 以外のシステム・アドイン・設定ファイルを差分同期
-        if sys.platform != "win32":
-            cmd = [
-                "rsync", "-av", "--update",
-                "--exclude=Log/",
-                "--exclude=.ain_app.lock",
-                "--exclude=*.tmp",
-                "--exclude=tmp_imagej/",
-                "--exclude=__pycache__/",
-                "--exclude=.git/",
-                "--exclude=.DS_Store",
-                src, dst
-            ]
-            subprocess.run(cmd, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        else:
-            exclude_names = {"Log", ".ain_app.lock", "tmp_imagej", "__pycache__", ".git"}
-            for root, dirs, files in os.walk(BASE_DIR):
-                dirs[:] = [d for d in dirs if d not in exclude_names]
-                rel_root = os.path.relpath(root, BASE_DIR)
-                target_root = dest_path if rel_root == "." else dest_path / rel_root
-                target_root.mkdir(parents=True, exist_ok=True)
-                for fname in files:
-                    if fname in exclude_names or fname.endswith(".tmp"):
-                        continue
-                    s_file = Path(root) / fname
-                    d_file = target_root / fname
-                    if not d_file.exists() or s_file.stat().st_mtime > d_file.stat().st_mtime:
-                        shutil.copy2(s_file, d_file)
+        # 🔒 開発者用隠しスイッチ: .ain_full_backup が存在する場合のみ全ソースを差分同期
+        is_full_backup = (BASE_DIR / ".ain_full_backup").exists()
+        if is_full_backup:
+            src = str(BASE_DIR).rstrip("/") + "/"
+            dst = str(dest_path).rstrip("/") + "/"
 
-        # 2. Log/ 配下は両端末の追記内容を保持する OR マージで同期
+            if sys.platform != "win32":
+                cmd = [
+                    "rsync", "-av", "--update",
+                    "--exclude=Log/",
+                    "--exclude=.ain_app.lock",
+                    "--exclude=.ain_full_backup",
+                    "--exclude=*.tmp",
+                    "--exclude=tmp_imagej/",
+                    "--exclude=__pycache__/",
+                    "--exclude=.git/",
+                    "--exclude=.DS_Store",
+                    src, dst
+                ]
+                subprocess.run(cmd, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            else:
+                exclude_names = {"Log", ".ain_app.lock", ".ain_full_backup", "tmp_imagej", "__pycache__", ".git"}
+                for root, dirs, files in os.walk(BASE_DIR):
+                    dirs[:] = [d for d in dirs if d not in exclude_names]
+                    rel_root = os.path.relpath(root, BASE_DIR)
+                    target_root = dest_path if rel_root == "." else dest_path / rel_root
+                    target_root.mkdir(parents=True, exist_ok=True)
+                    for fname in files:
+                        if fname in exclude_names or fname.endswith(".tmp"):
+                            continue
+                        s_file = Path(root) / fname
+                        d_file = target_root / fname
+                        if not d_file.exists() or s_file.stat().st_mtime > d_file.stat().st_mtime:
+                            shutil.copy2(s_file, d_file)
+
+        # 全ユーザー共通: Log/ 配下は OR マージ＆差分同期
         sync_logs_with_or_merge(BASE_DIR / "Log", dest_path / "Log")
 
-        print(f"✅ 差分バックアップ＆ログOR統合完了: {dst}")
+        mode_label = "全ソース＆ログOR統合" if is_full_backup else "ログOR統合"
+        print(f"✅ バックアップ完了 ({mode_label}): {dest_path}")
     except Exception as e:
         print(f"[Exit Backup Error] {e}")
 
@@ -613,8 +617,7 @@ def on_main_closed():
 # 起動エントリーポイント
 # ==========================================
 def start_server():
-    uvicorn.run(app, host="127.0.0.1", port=8000, log_level="warning")
-    # uvicorn.run(app, host="0.0.0.0", port=8000, log_level="warning")
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="warning")
 
 
 if __name__ == "__main__":
