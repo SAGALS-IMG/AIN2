@@ -157,17 +157,177 @@
         <button id="btn_superscript" onmousedown="event.preventDefault()" onclick="SB_SuperScriptClick()" title="上付き文字" class="w-6 h-6 flex items-center justify-center font-mono font-bold hover:bg-gray-300 rounded text-xs text-gray-700">x²</button>
         <button id="btn_subscript" onmousedown="event.preventDefault()" onclick="SB_SubScriptClick()" title="下付き文字" class="w-6 h-6 flex items-center justify-center font-mono font-bold hover:bg-gray-300 rounded text-xs text-gray-700">x₂</button>
         
-        <button id="btn_color" onmousedown="event.preventDefault()" onclick="SB_Pen_ColorClick()" title="文字色 (赤/黒)" class="w-6 h-6 flex items-center justify-center text-red-600 font-bold hover:bg-gray-300 rounded">A</button>
-        <button id="btn_highlight" onmousedown="event.preventDefault()" onclick="SB_HighlightClick()" title="マーカー" class="w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded">🖊</button>
+        <!-- 文字色カラーパレット -->
+        <div class="relative inline-block" id="colorPickerWrapper">
+          <button id="btn_color" onmousedown="event.preventDefault()" onclick="toggleColorPalette(event)" title="文字色" class="relative w-6 h-6 flex items-center justify-center font-bold hover:bg-gray-300 rounded">
+            <span class="text-[11px] text-gray-800 leading-none pb-[3px]">A</span>
+            <span id="btn_color_bar" class="absolute bottom-[3px] left-1/2 -translate-x-1/2 w-3.5 h-[2.5px] bg-red-600"></span>
+          </button>
+
+          <!-- ドロップダウンカラーマップ -->
+          <div id="colorPalettePopup" onmousedown="event.preventDefault()" class="hidden absolute left-0 top-full mt-1 bg-white border border-gray-300 rounded shadow-xl p-2 z-40 w-[164px] select-none">
+            <div class="text-[10px] text-gray-500 font-bold mb-1">文字色を選択</div>
+            
+            <!-- 基本・アクセントカラーマップ (5列×4行) -->
+            <div class="grid grid-cols-5 gap-1 mb-1.5">
+              <!-- 1行目: モノトーン〜基本色 -->
+              <button type="button" onclick="applyTextColor('#111827')" title="ブラック" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #111827;"></button>
+              <button type="button" onclick="applyTextColor('#6b7280')" title="グレー" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #6b7280;"></button>
+              <button type="button" onclick="applyTextColor('#dc2626')" title="レッド" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #dc2626;"></button>
+              <button type="button" onclick="applyTextColor('#2563eb')" title="ブルー" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #2563eb;"></button>
+              <button type="button" onclick="applyTextColor('#059669')" title="グリーン" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #059669;"></button>
+
+              <!-- 2行目: ビビッド -->
+              <button type="button" onclick="applyTextColor('#d97706')" title="アンバー" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #d97706;"></button>
+              <button type="button" onclick="applyTextColor('#7c3aed')" title="パープル" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #7c3aed;"></button>
+              <button type="button" onclick="applyTextColor('#db2777')" title="ピンク" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #db2777;"></button>
+              <button type="button" onclick="applyTextColor('#0891b2')" title="シアン" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #0891b2;"></button>
+              <button type="button" onclick="applyTextColor('#ea580c')" title="オレンジ" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #ea580c;"></button>
+
+              <!-- 3行目: ダークトーン（実験ログで読みやすい濃色） -->
+              <button type="button" onclick="applyTextColor('#7f1d1d')" title="ダークレッド" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #7f1d1d;"></button>
+              <button type="button" onclick="applyTextColor('#1e3a8a')" title="ネイビー" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #1e3a8a;"></button>
+              <button type="button" onclick="applyTextColor('#064e3b')" title="ダークグリーン" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #064e3b;"></button>
+              <button type="button" onclick="applyTextColor('#581c87')" title="ディープパープル" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #581c87;"></button>
+              <button type="button" onclick="applyTextColor('#78350f')" title="ブラウン" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #78350f;"></button>
+
+              <!-- 4行目: ライトトーン（ダークモード時にも映える明色） -->
+              <button type="button" onclick="applyTextColor('#f87171')" title="ライトレッド" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #f87171;"></button>
+              <button type="button" onclick="applyTextColor('#60a5fa')" title="スカイブルー" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #60a5fa;"></button>
+              <button type="button" onclick="applyTextColor('#34d399')" title="ミント" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #34d399;"></button>
+              <button type="button" onclick="applyTextColor('#facc15')" title="イエロー" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #facc15;"></button>
+              <button type="button" onclick="applyTextColor('#f3f4f6')" title="ホワイト" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #f3f4f6;"></button>
+            </div>
+
+            <!-- 標準色リセット ＆ カスタムカラー -->
+            <div class="border-t border-gray-200 pt-1.5 flex items-center justify-between space-x-1">
+              <button type="button" onclick="resetTextColor()" class="flex-1 py-1 px-1.5 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded text-[10px] font-bold text-gray-700">
+                標準色に戻す
+              </button>
+              <div title="カスタムカラー" class="relative w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded text-xs overflow-hidden">
+                <span>🎨</span>
+                <input id="customTextColorInput" type="color" value="#dc2626"
+                  onmousedown="saveSelectionForColor()"
+                  oninput="applyTextColor(this.value, false)"
+                  onchange="applyTextColor(this.value, true)"
+                  class="opacity-0 absolute inset-0 w-full h-full cursor-pointer">
+              </div>
+            </div>
+          </div>
+        </div>       
+
+        <!-- マーカー（ハイライト）カラーパレット -->
+        <div class="relative inline-block" id="highlightPickerWrapper">
+          <button id="btn_highlight" onmousedown="event.preventDefault()" onclick="toggleHighlightPalette(event)" title="マーカー" class="relative w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded">
+            <span class="text-[10px] leading-none pb-[3px]">🖊</span>
+            <span id="btn_highlight_bar" class="absolute bottom-[3px] left-1/2 -translate-x-1/2 w-3.5 h-[2.5px] bg-yellow-300"></span>
+          </button>
+
+          <!-- ドロップダウンカラーマップ -->
+          <div id="highlightPalettePopup" onmousedown="event.preventDefault()" class="hidden absolute left-0 top-full mt-1 bg-white border border-gray-300 rounded shadow-xl p-2 z-40 w-[164px] select-none">
+            <div class="text-[10px] text-gray-500 font-bold mb-1">マーカー色を選択</div>
+
+            <!-- 蛍光・パステル系カラーマップ (5列×4行) -->
+            <div class="grid grid-cols-5 gap-1 mb-1.5">
+              <!-- 1行目: 定番蛍光ペンカラー -->
+              <button type="button" onclick="applyHighlightColor('#fef08a')" title="イエロー" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #fef08a;"></button>
+              <button type="button" onclick="applyHighlightColor('#bbf7d0')" title="ライトグリーン" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #bbf7d0;"></button>
+              <button type="button" onclick="applyHighlightColor('#bae6fd')" title="スカイブルー" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #bae6fd;"></button>
+              <button type="button" onclick="applyHighlightColor('#fbcfe8')" title="ピンク" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #fbcfe8;"></button>
+              <button type="button" onclick="applyHighlightColor('#fed7aa')" title="オレンジ" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #fed7aa;"></button>
+
+              <!-- 2行目: ソフトパステル -->
+              <button type="button" onclick="applyHighlightColor('#e9d5ff')" title="ラベンダー" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #e9d5ff;"></button>
+              <button type="button" onclick="applyHighlightColor('#99f6e4')" title="ミント" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #99f6e4;"></button>
+              <button type="button" onclick="applyHighlightColor('#fecaca')" title="コーラル" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #fecaca;"></button>
+              <button type="button" onclick="applyHighlightColor('#d9f99d')" title="ライム" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #d9f99d;"></button>
+              <button type="button" onclick="applyHighlightColor('#e5e7eb')" title="ライトグレー" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #e5e7eb;"></button>
+
+              <!-- 3行目: ビビッド蛍光 -->
+              <button type="button" onclick="applyHighlightColor('#fde047')" title="ビビッドイエロー" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #fde047;"></button>
+              <button type="button" onclick="applyHighlightColor('#4ade80')" title="ビビッドグリーン" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #4ade80;"></button>
+              <button type="button" onclick="applyHighlightColor('#38bdf8')" title="ビビッドブルー" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #38bdf8;"></button>
+              <button type="button" onclick="applyHighlightColor('#f472b6')" title="ビビッドピンク" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #f472b6;"></button>
+              <button type="button" onclick="applyHighlightColor('#fb923c')" title="ビビッドオレンジ" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #fb923c;"></button>
+
+              <!-- 4行目: ダークモード向け落ち着きトーン -->
+              <button type="button" onclick="applyHighlightColor('#854d0e')" title="ダークアンバー" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #854d0e;"></button>
+              <button type="button" onclick="applyHighlightColor('#166534')" title="フォレスト" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #166534;"></button>
+              <button type="button" onclick="applyHighlightColor('#1e40af')" title="ディープブルー" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #1e40af;"></button>
+              <button type="button" onclick="applyHighlightColor('#9d174d')" title="ボルドー" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #9d174d;"></button>
+              <button type="button" onclick="applyHighlightColor('#374151')" title="チャコール" class="w-6 h-6 rounded border border-gray-300 hover:scale-110 transition-transform" style="background-color: #374151;"></button>
+            </div>
+
+            <!-- マーカー解除 ＆ カスタムカラー -->
+            <div class="border-t border-gray-200 pt-1.5 flex items-center justify-between space-x-1">
+              <button type="button" onclick="resetHighlightColor()" class="flex-1 py-1 px-1.5 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded text-[10px] font-bold text-gray-700">
+                マーカーなし
+              </button>
+              <div title="カスタムカラー" class="relative w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded text-xs overflow-hidden">
+                <span>🎨</span>
+                <input id="customHighlightColorInput" type="color" value="#fef08a"
+                  onmousedown="saveSelectionForColor()"
+                  oninput="applyHighlightColor(this.value, false)"
+                  onchange="applyHighlightColor(this.value, true)"
+                  class="opacity-0 absolute inset-0 w-full h-full cursor-pointer">
+              </div>
+            </div>
+          </div>
+        </div>
 
         <div class="w-[2px] h-4 bg-gray-400 mx-1"></div>
 
         <button onmousedown="event.preventDefault()" onclick="SB_ListClick()" title="箇条書き" class="w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded">☰</button>
         <button onmousedown="event.preventDefault()" onclick="SB_OrderedListClick()" title="番号付きリスト" class="w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded">①</button>
-        <button onmousedown="event.preventDefault()" onclick="toggleBoxWrapper()" title="枠囲み" class="w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded">▭</button>
+        
+        <!-- ボックス（枠囲み）カラーパレット -->
+        <div class="relative inline-block" id="boxPickerWrapper">
+          <button id="btn_box" onmousedown="event.preventDefault()" onclick="toggleBoxPalette(event)" title="枠囲み（ボックス色）" class="relative w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded">
+            <span class="text-xs leading-none pb-[3px]">▭</span>
+            <span id="btn_box_bar" class="absolute bottom-[3px] left-1/2 -translate-x-1/2 w-3.5 h-[2.5px]" style="background-color: #0d9488;"></span>
+          </button>
 
+          <!-- ドロップダウンカラーマップ -->
+          <div id="boxPalettePopup" onmousedown="event.preventDefault()" class="hidden absolute left-0 top-full mt-1 bg-white border border-gray-300 rounded shadow-xl p-2 z-40 w-[164px] select-none">
+            <div class="text-[10px] text-gray-500 font-bold mb-1">ボックス色を選択</div>
+
+            <!-- テーマカラーマップ (5列×2行: 濃色ボーダー＋淡色背景のペア) -->
+            <div class="grid grid-cols-5 gap-1 mb-1.5">
+              <!-- 1行目: 標準ティール・寒色・暖色 -->
+              <button type="button" onclick="applyBoxColor('#0d9488', '#f0fdfa')" title="ティール（標準）" class="w-6 h-6 rounded border-l-4 hover:scale-110 transition-transform" style="border-color: #0d9488; background-color: #f0fdfa;"></button>
+              <button type="button" onclick="applyBoxColor('#2563eb', '#eff6ff')" title="ブルー" class="w-6 h-6 rounded border-l-4 hover:scale-110 transition-transform" style="border-color: #2563eb; background-color: #eff6ff;"></button>
+              <button type="button" onclick="applyBoxColor('#059669', '#ecfdf5')" title="グリーン" class="w-6 h-6 rounded border-l-4 hover:scale-110 transition-transform" style="border-color: #059669; background-color: #ecfdf5;"></button>
+              <button type="button" onclick="applyBoxColor('#d97706', '#fffbeb')" title="アンバー" class="w-6 h-6 rounded border-l-4 hover:scale-110 transition-transform" style="border-color: #d97706; background-color: #fffbeb;"></button>
+              <button type="button" onclick="applyBoxColor('#dc2626', '#fef2f2')" title="レッド" class="w-6 h-6 rounded border-l-4 hover:scale-110 transition-transform" style="border-color: #dc2626; background-color: #fef2f2;"></button>
+
+              <!-- 2行目: パープル・ピンク・シアン・オレンジ・スレート -->
+              <button type="button" onclick="applyBoxColor('#7c3aed', '#f5f3ff')" title="パープル" class="w-6 h-6 rounded border-l-4 hover:scale-110 transition-transform" style="border-color: #7c3aed; background-color: #f5f3ff;"></button>
+              <button type="button" onclick="applyBoxColor('#db2777', '#fdf2f8')" title="ピンク" class="w-6 h-6 rounded border-l-4 hover:scale-110 transition-transform" style="border-color: #db2777; background-color: #fdf2f8;"></button>
+              <button type="button" onclick="applyBoxColor('#0891b2', '#ecfeff')" title="シアン" class="w-6 h-6 rounded border-l-4 hover:scale-110 transition-transform" style="border-color: #0891b2; background-color: #ecfeff;"></button>
+              <button type="button" onclick="applyBoxColor('#ea580c', '#fff7ed')" title="オレンジ" class="w-6 h-6 rounded border-l-4 hover:scale-110 transition-transform" style="border-color: #ea580c; background-color: #fff7ed;"></button>
+              <button type="button" onclick="applyBoxColor('#4b5563', '#f3f4f6')" title="グレー" class="w-6 h-6 rounded border-l-4 hover:scale-110 transition-transform" style="border-color: #4b5563; background-color: #f3f4f6;"></button>
+            </div>
+
+            <!-- 枠解除 ＆ カスタムカラー -->
+            <div class="border-t border-gray-200 pt-1.5 flex items-center justify-between space-x-1">
+              <button type="button" onclick="unwrapCurrentBox()" class="flex-1 py-1 px-1.5 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded text-[10px] font-bold text-gray-700">
+                枠を解除
+              </button>
+              <div title="カスタムカラー" class="relative w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded text-xs overflow-hidden">
+                <span>🎨</span>
+                <input id="customBoxColorInput" type="color" value="#0d9488"
+                  onmousedown="saveSelectionForColor()"
+                  oninput="applyCustomBoxColor(this.value, false)"
+                  onchange="applyCustomBoxColor(this.value, true)"
+                  class="opacity-0 absolute inset-0 w-full h-full cursor-pointer">
+              </div>
+            </div>
+          </div>
+        </div>        
+       
+     
         <!-- 🎨 イラスト枠挿入 -->
-      <div class="relative inline-block">
+        <div class="relative inline-block">
           <button onclick="toggleCanvasInsertPopup(event)" title="イラスト枠挿入" class="w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded">🎨</button>
           <div id="canvasInsertPopup" class="hidden absolute left-0 top-full mt-1 bg-white border border-gray-300 rounded shadow-xl p-1.5 z-40 flex items-center space-x-1.5 text-xs select-none">
             <span class="text-[10px] text-gray-500 whitespace-nowrap">行数:</span>
@@ -194,7 +354,7 @@
 
         <!-- 👤 アカウント選択 -->
         <div class="flex items-center space-x-1 mr-2">
-          <span class="text-[11px] text-gray-500 font-bold">👤</span>
+          <span id="account_avatar_badge" class="w-4 h-4 rounded-full bg-teal-600 text-white text-[10px] font-bold flex items-center justify-center shadow-2xs">D</span>
           <select id="sel_account" onchange="handleAccountChange(this.value)" class="h-6 px-1 bg-white border border-gray-400 rounded text-xs font-bold outline-none text-gray-700 cursor-pointer"></select>
         </div>
 
@@ -310,64 +470,78 @@
     <span id="saveStatus" class="text-gray-200">未変更</span>
   </footer>
 
-  <!-- ⚛️ 放射光データ (SR Info) 入力モーダル -->
-  <div id="modalInit" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center select-none">
-    <div class="bg-[#f0f0f0] border border-gray-400 shadow-2xl rounded p-3 w-[290px] text-xs font-sans text-gray-800">
-      <div class="font-bold border-b border-gray-300 pb-1 mb-2 flex justify-between items-center text-gray-700">
-        <span>⚛️ Init SR Log</span>
-        <button onclick="closeInitModal()" class="text-gray-400 hover:text-gray-600 font-bold px-1">✕</button>
+<!-- ⚛️ 放射光データ (SR Info) 入力モーダル -->
+  <div id="modalInit" class="hidden fixed inset-0 bg-black/45 z-50 flex items-center justify-center select-none backdrop-blur-[1px]">
+    <div class="bg-white border border-gray-300 shadow-2xl rounded-xl w-[360px] overflow-hidden text-xs font-sans text-gray-800 flex flex-col">
+      <!-- ヘッダー -->
+      <div class="bg-gradient-to-r from-teal-700 to-cyan-700 text-white px-4 py-2.5 flex justify-between items-center">
+        <div class="flex items-center space-x-2">
+          <span class="text-base">⚛️</span>
+          <span class="font-bold text-sm tracking-wide">Insert SR Info</span>
+        </div>
+        <button onclick="closeInitModal()" class="text-white/80 hover:text-white font-bold px-1.5 py-0.5 rounded hover:bg-white/10 transition-colors">✕</button>
       </div>
 
-      <div class="space-y-2">
-        <div>
-          <div class="flex justify-between items-center mb-0.5">
-            <label class="font-medium text-gray-700">Facility</label>
-            <select id="sel_facility" onchange="onSelectPreset('facility')" class="w-36 border border-gray-400 bg-white rounded px-1 py-0.5 text-xs outline-none"></select>
+      <!-- フォーム本体 -->
+      <div class="p-4 space-y-2.5 bg-gray-50/70">
+        <!-- Facility -->
+        <div class="bg-white p-2 rounded-lg border border-gray-200 shadow-2xs">
+          <div class="flex justify-between items-center mb-1">
+            <label class="font-bold text-teal-800 text-[11px]">Facility</label>
+            <select id="sel_facility" onchange="onSelectPreset('facility')" class="w-44 border border-gray-300 bg-gray-50 hover:bg-white rounded px-1.5 py-0.5 text-xs outline-none cursor-pointer"></select>
           </div>
-          <input id="init_facility" type="text" placeholder="新規入力 / 選択中" class="w-full border border-gray-300 bg-white rounded px-1.5 py-0.5 text-xs outline-none">
+          <input id="init_facility" type="text" placeholder="新規入力 / 選択中" class="w-full border border-gray-300 bg-white focus:border-teal-500 rounded px-2 py-1 text-xs outline-none">
         </div>
 
-        <div>
-          <div class="flex justify-between items-center mb-0.5">
-            <label class="font-medium text-gray-700">Beamline</label>
-            <select id="sel_beamline" onchange="onSelectPreset('beamline')" class="w-36 border border-gray-400 bg-white rounded px-1 py-0.5 text-xs outline-none"></select>
+        <!-- Beamline -->
+        <div class="bg-white p-2 rounded-lg border border-gray-200 shadow-2xs">
+          <div class="flex justify-between items-center mb-1">
+            <label class="font-bold text-teal-800 text-[11px]">Beamline</label>
+            <select id="sel_beamline" onchange="onSelectPreset('beamline')" class="w-44 border border-gray-300 bg-gray-50 hover:bg-white rounded px-1.5 py-0.5 text-xs outline-none cursor-pointer"></select>
           </div>
-          <input id="init_beamline" type="text" placeholder="新規入力 / 選択中" class="w-full border border-gray-300 bg-white rounded px-1.5 py-0.5 text-xs outline-none">
+          <input id="init_beamline" type="text" placeholder="新規入力 / 選択中" class="w-full border border-gray-300 bg-white focus:border-teal-500 rounded px-2 py-1 text-xs outline-none">
         </div>
 
-        <div>
-          <div class="flex justify-between items-center mb-0.5">
-            <label class="font-medium text-gray-700">Energy filter</label>
-            <select id="sel_filter" onchange="onSelectPreset('filter')" class="w-36 border border-gray-400 bg-white rounded px-1 py-0.5 text-xs outline-none"></select>
+        <!-- Energy filter & Energy (2カラム横並び) -->
+        <div class="bg-white p-2 rounded-lg border border-gray-200 shadow-2xs space-y-1.5">
+          <div class="flex justify-between items-center">
+            <label class="font-bold text-teal-800 text-[11px]">Energy filter</label>
+            <select id="sel_filter" onchange="onSelectPreset('filter')" class="w-44 border border-gray-300 bg-gray-50 hover:bg-white rounded px-1.5 py-0.5 text-xs outline-none cursor-pointer"></select>
           </div>
-          <input id="init_filter" type="text" placeholder="新規入力 / 選択中" class="w-full border border-gray-300 bg-white rounded px-1.5 py-0.5 text-xs outline-none">
+          <div class="flex space-x-1.5">
+            <input id="init_filter" type="text" placeholder="分光結晶・フィルタ" class="flex-1 border border-gray-300 bg-white focus:border-teal-500 rounded px-2 py-1 text-xs outline-none">
+            <div class="flex items-center border border-gray-300 bg-white focus-within:border-teal-500 rounded px-2 py-1 w-28">
+              <input id="init_energy" type="text" value="10.0" class="w-full text-right font-mono font-bold text-xs outline-none bg-transparent">
+              <span class="text-[10px] text-gray-500 ml-1 font-mono">keV</span>
+            </div>
+          </div>
         </div>
 
-        <div class="flex justify-between items-center pt-1">
-          <label class="font-medium text-gray-700">Energy [keV]</label>
-          <input id="init_energy" type="text" value="10.0" class="w-36 border border-gray-400 bg-white rounded px-1.5 py-0.5 text-xs outline-none text-right">
+        <!-- Method -->
+        <div class="bg-white p-2 rounded-lg border border-gray-200 shadow-2xs">
+          <div class="flex justify-between items-center mb-1">
+            <label class="font-bold text-teal-800 text-[11px]">Method</label>
+            <select id="sel_method" onchange="onSelectPreset('method')" class="w-44 border border-gray-300 bg-gray-50 hover:bg-white rounded px-1.5 py-0.5 text-xs outline-none cursor-pointer"></select>
+          </div>
+          <input id="init_method" type="text" placeholder="新規入力 / 選択中" class="w-full border border-gray-300 bg-white focus:border-teal-500 rounded px-2 py-1 text-xs outline-none">
         </div>
 
-        <div>
-          <div class="flex justify-between items-center mb-0.5">
-            <label class="font-medium text-gray-700">Method</label>
-            <select id="sel_method" onchange="onSelectPreset('method')" class="w-36 border border-gray-400 bg-white rounded px-1 py-0.5 text-xs outline-none"></select>
+        <!-- Group (旧 Member) -->
+        <div class="bg-white p-2 rounded-lg border border-gray-200 shadow-2xs">
+          <div class="flex justify-between items-center mb-1">
+            <label class="font-bold text-teal-800 text-[11px]">Group</label>
+            <select id="sel_group" onchange="onSelectPreset('group')" class="w-44 border border-gray-300 bg-gray-50 hover:bg-white rounded px-1.5 py-0.5 text-xs outline-none cursor-pointer"></select>
           </div>
-          <input id="init_method" type="text" placeholder="新規入力 / 選択中" class="w-full border border-gray-300 bg-white rounded px-1.5 py-0.5 text-xs outline-none">
-        </div>
-
-        <div>
-          <div class="flex justify-between items-center mb-0.5">
-            <label class="font-medium text-gray-700">Member</label>
-            <select id="sel_member" onchange="onSelectPreset('member')" class="w-36 border border-gray-400 bg-white rounded px-1 py-0.5 text-xs outline-none"></select>
-          </div>
-          <input id="init_member" type="text" placeholder="新規入力 / 選択中" class="w-full border border-gray-300 bg-white rounded px-1.5 py-0.5 text-xs outline-none">
+          <input id="init_group" type="text" placeholder="共同研究グループ・所属など" class="w-full border border-gray-300 bg-white focus:border-teal-500 rounded px-2 py-1 text-xs outline-none">
         </div>
       </div>
 
-      <div class="mt-3 pt-2 border-t border-gray-300 flex justify-end space-x-2">
-        <button onclick="closeInitModal()" class="px-3 py-1 bg-gray-200 hover:bg-gray-300 border border-gray-400 rounded text-xs shadow-sm">Cancel</button>
-        <button onclick="insertSRInfo()" class="px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded text-xs shadow-sm">OK</button>
+      <!-- フッター -->
+      <div class="px-4 py-2.5 bg-gray-100 border-t border-gray-200 flex justify-end space-x-2">
+        <button onclick="closeInitModal()" class="px-3.5 py-1.5 bg-white hover:bg-gray-200 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 transition-colors">Cancel</button>
+        <button onclick="insertSRInfo()" class="px-4 py-1.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-lg text-xs shadow-sm transition-colors flex items-center space-x-1">
+          <span>✓</span><span>Insert Box</span>
+        </button>
       </div>
     </div>
   </div>
@@ -516,27 +690,27 @@
         </div>
 
         <!-- Ring タブ -->
-        <div id="tab_Ring" class="hidden space-y-2">
-          <div class="border border-gray-400 p-2 rounded bg-white/50 space-y-2">
-            <div>
-              <label class="block font-bold mb-1 text-teal-800">使用施設 (Active Facility)</label>
-              <select id="opt_ring_facility" class="w-full border border-gray-400 p-1 rounded bg-white text-xs font-bold">
-                <option value="SAGA-LS">SAGA-LS</option>
-                <option value="SPring-8">SPring-8</option>
-                <option value="PF">PF (Photon Factory)</option>
-              </select>
+        <div id="tab_Ring" class="hidden space-y-2.5">
+          <div class="border border-gray-400 p-2.5 rounded bg-white/60 space-y-2">
+            <!-- 使用中の施設選択 -->
+            <div class="flex items-center justify-between border-b border-gray-300 pb-2">
+              <label id="lbl_ring_active" class="font-bold text-teal-800">💍 使用施設 (Active Facility)</label>
+              <select id="opt_ring_facility" class="w-48 border border-gray-400 p-1 rounded bg-white text-xs font-bold outline-none cursor-pointer"></select>
             </div>
-            <div>
-              <label class="block font-bold mb-0.5 text-gray-700">SAGA-LS Image URL</label>
-              <input id="opt_ring_url_sagals" type="text" class="w-full border border-gray-400 p-1 rounded bg-white text-xs font-mono">
-            </div>
-            <div>
-              <label class="block font-bold mb-0.5 text-gray-700">SPring-8 Image URL</label>
-              <input id="opt_ring_url_spring8" type="text" class="w-full border border-gray-400 p-1 rounded bg-white text-xs font-mono">
-            </div>
-            <div>
-              <label class="block font-bold mb-0.5 text-gray-700">PF Image URL</label>
-              <input id="opt_ring_url_pf" type="text" class="w-full border border-gray-400 p-1 rounded bg-white text-xs font-mono">
+
+            <!-- 編集可能な施設リスト -->
+            <div class="space-y-1">
+              <div class="flex justify-between items-center text-[11px] font-bold text-gray-600 px-1">
+                <span id="lbl_ring_list_title">登録施設リスト（施設名 / ステータス画像URL）</span>
+                <button id="btn_add_ring_facility" type="button" onclick="addRingFacilityRow()" class="px-2 py-0.5 bg-teal-600 hover:bg-teal-700 text-white rounded text-[10px] font-bold shadow-2xs">
+                  + 施設を追加
+                </button>
+              </div>
+
+              <!-- スクロール可能な行コンテナ -->
+              <div id="ringFacilityListContainer" class="max-h-[150px] overflow-y-auto space-y-1.5 pr-0.5">
+                <!-- JSで動的に行が生成されます -->
+              </div>
             </div>
           </div>
         </div>
@@ -559,7 +733,7 @@
       </div>
 
       <div class="font-extrabold text-lg text-gray-900 tracking-tight">AILab_Note (AIN2)</div>
-      <div class="text-[11px] text-teal-700 font-mono font-semibold mb-3">Version 2.3.0 (Modular Edition)</div>
+      <div class="text-[11px] text-teal-700 font-mono font-semibold mb-3">Version 2.3.1 (Modular Edition)</div>
       <div class="w-full text-xs text-gray-600 py-2.5 px-3 border-y border-gray-200 bg-gray-50/60 rounded-md space-y-1.5 text-left mb-4">
         <div class="flex justify-between items-center">
           <span class="text-gray-400 font-medium text-[11px]">Developer:</span>
