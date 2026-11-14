@@ -160,12 +160,21 @@ def get_xray_physics(element: str, energy_kev: float):
 # 5. リング電流取得 (OCR)
 # ==========================================
 def fetch_ring_current_by_facility(facility: str, cfg: dict) -> str:
-    url_map = {
-        "SAGA-LS": cfg.get("ring_url_sagals", "https://www.saga-ls.jp/acc/accstatus.jpg"),
-        "SPring-8": cfg.get("ring_url_spring8", "https://spring8.jp/status/sr_status_en.png"),
-        "PF": cfg.get("ring_url_pf", "https://www-pfring.kek.jp/PF/status/pf_status.png")
-    }
-    base_url = url_map.get(facility, "")
+    # 1. URLの解決（新形式 ring_url -> ring_facilities リスト -> 旧設定の順で探索）
+    base_url = cfg.get("ring_url", "").strip()
+    if not base_url:
+        for item in cfg.get("ring_facilities", []):
+            if item.get("name") == facility:
+                base_url = item.get("url", "").strip()
+                break
+    if not base_url:
+        legacy_map = {
+            "SAGA-LS": cfg.get("ring_url_sagals", "https://www.saga-ls.jp/acc/accstatus.jpg"),
+            "SPring-8": cfg.get("ring_url_spring8", "https://spring8.jp/status/sr_status_en.png"),
+            "PF": cfg.get("ring_url_pf", "https://www-pfring.kek.jp/PF/status/pf_status.png")
+        }
+        base_url = legacy_map.get(facility, "")
+
     if not base_url:
         return "URL未設定"
 
@@ -177,13 +186,51 @@ def fetch_ring_current_by_facility(facility: str, cfg: dict) -> str:
         resp = requests.get(target_url, headers=headers, timeout=5.0)
         if resp.status_code != 200:
             return f"HTTP {resp.status_code}"
+
+        content_type = resp.headers.get("Content-Type", "").lower()
+
+        # ① 画像以外（JSON / テキスト / HTML）が返ってきた場合
+        if "image" not in content_type:
+            # 1) JSON としてパースできるか試みる（NanoTerasu 等に対応）
+            try:
+                data = resp.json()
+                if isinstance(data, dict):
+                    for k, v in data.items():
+                        # キー名に "current" を含むものを探索
+                        if "current" in k.lower():
+                            # NanoTerasu形式: {"res": [["timestamp", 400.1, ...]]}
+                            if isinstance(v, dict) and "res" in v:
+                                res_list = v.get("res")
+                                if isinstance(res_list, list) and len(res_list) > 0:
+                                    first_item = res_list[0]
+                                    if isinstance(first_item, list) and len(first_item) >= 2:
+                                        return f"{float(first_item[1]):.2f} mA"
+                            # シンプルなJSON形式: {"current": 400.1} または {"beam_current": "400.1"}
+                            elif isinstance(v, (int, float)):
+                                return f"{float(v):.2f} mA"
+                            elif isinstance(v, str):
+                                m_num = re.search(r'\d+(?:\.\d+)?', v)
+                                if m_num:
+                                    return f"{float(m_num.group()):.2f} mA"
+            except Exception:
+                pass
+
+            # 2) JSON以外のテキスト / HTML からの「数値 + mA」抽出フォールバック
+            clean_text = re.sub(r'<[^>]+>', ' ', resp.text)
+            for m in re.finditer(r'(\d+(?:\.\d+)?)\s*mA', clean_text, re.IGNORECASE):
+                val = float(m.group(1))
+                if val > 0:
+                    return f"{val:.2f} mA"
+
+            return "---.- mA"
+
+        # ② 画像の場合はこれまで通り OpenCV でデコード
         img_array = np.asarray(bytearray(resp.content), dtype=np.uint8)
         img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
         if img is None:
             return "デコード失敗"
     except Exception as e:
         return f"通信エラー: {str(e)}"
-
     h, w, _ = img.shape
     text = ""
 
@@ -217,6 +264,16 @@ def fetch_ring_current_by_facility(facility: str, cfg: dict) -> str:
             _, thresh = cv2.threshold(resized, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
             custom_config = r'--psm 7 -c tessedit_char_whitelist=0123456789.'
             text = pytesseract.image_to_string(thresh, config=custom_config).strip()
+
+        else:
+            # ユーザー追加施設向け：画像全体から「数値 + mA」を自動探索
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            full_text = pytesseract.image_to_string(gray, config=r'--psm 6')
+            ma_match = re.search(r'(\d+(?:\.\d+)?)\s*mA', full_text, re.IGNORECASE)
+            if ma_match:
+                return f"{float(ma_match.group(1)):.2f} mA"
+            return "---.- mA"
+
     except pytesseract.TesseractNotFoundError:
         return "OCR未導入 (Tesseract)"
     except Exception as e:
