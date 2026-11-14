@@ -393,8 +393,7 @@ async function SB_InitClick() {
   try {
     const res = await fetch(`${API_BASE}/config?account=${encodeURIComponent(currentAccountName)}`);
     const cfg = await res.json();
-    
-    // sr_info が存在しない古い設定へのフォールバック
+
     currentSrConfig = cfg.sr_info || {
       last_values: {
         facility: "SAGA-LS",
@@ -402,23 +401,33 @@ async function SB_InitClick() {
         filter: "Si(111)",
         energy: "10.0",
         method: "Abs CT",
-        member: ""
+        group: ""
       },
       presets: {
         facility: ["SAGA-LS", "PF", "PF AR", "SPring-8"],
         beamline: ["BL07", "BL-14B", "BL-14C", "BL-20B"],
         filter: ["Si(111)", "Si(220)", "Ge(111)", "Metal filter", "none"],
         method: ["Abs CT", "micro CT", "Cryo micro CT", "Interferometry CT", "DEI CT", "STXM"],
-        member: [""]
+        group: [""]
       }
     };
 
-    const keys = ['facility', 'beamline', 'filter', 'method', 'member'];
+    // 既存設定の member -> group への自動マイグレーション（後方互換）
+    if (!currentSrConfig.presets.group && currentSrConfig.presets.member) {
+      currentSrConfig.presets.group = [...currentSrConfig.presets.member];
+    }
+    if (currentSrConfig.last_values.group === undefined && currentSrConfig.last_values.member !== undefined) {
+      currentSrConfig.last_values.group = currentSrConfig.last_values.member;
+    }
+
+    const keys = ['facility', 'beamline', 'filter', 'method', 'group'];
     keys.forEach(key => {
       const sel = document.getElementById(`sel_${key}`);
       const inp = document.getElementById(`init_${key}`);
+      if (!sel || !inp) return;
+
       const list = currentSrConfig.presets[key] || [];
-      const lastVal = currentSrConfig.last_values[key] || (list[0] || '');
+      const lastVal = currentSrConfig.last_values[key] ?? (list[0] || '');
 
       sel.innerHTML = '';
       list.forEach(val => {
@@ -432,7 +441,6 @@ async function SB_InitClick() {
       inp.value = lastVal;
     });
 
-    // Energy（数値）の復元
     const eneVal = currentSrConfig.last_values.energy || "10.0";
     const eneInput = document.getElementById('init_energy');
     if (eneInput) eneInput.value = eneVal;
@@ -446,30 +454,34 @@ function closeInitModal() {
   document.getElementById('modalInit').classList.add('hidden');
 }
 
-// OKボタン押下時: ノート挿入 ＋ 新規値のリスト追加 ＋ アカウント設定保存
+// OKボタン押下時: ボックス形式でノート挿入 ＋ 新規値のリスト追加 ＋ アカウント設定保存
 async function insertSRInfo() {
   const fac = document.getElementById('init_facility').value.trim();
-  const bl = document.getElementById('init_beamline').value.trim();
+  const bl  = document.getElementById('init_beamline').value.trim();
   const fil = document.getElementById('init_filter').value.trim();
   const ene = document.getElementById('init_energy').value.trim();
   const met = document.getElementById('init_method').value.trim();
-  const mem = document.getElementById('init_member').value.trim();
+  const grp = document.getElementById('init_group').value.trim();
 
-  // 1. ノートへテキスト挿入
-  const textToInsert = [
-    `Facility: ${fac}`,
-    `Beamline: ${bl}`,
-    `Energy filter: ${fil}`,
-    `Energy: ${ene} keV`,
-    `Method: ${met}`,
-    `Member: ${mem}`,
-    `----------------------------------------`,
-    ``
-  ].join('\n');
+  // 1. ノートへボックス形式でHTML挿入
+  const boxHtml = `
+    <div class="box-wrapper" style="border-left: 4px solid #0d9488; background-color: #f0fdfa; padding: 10px 14px; margin: 10px 0; font-family: monospace; font-size: 12.5px; line-height: 1.6; color: #134e4a; border-radius: 4px;">
+      <div style="font-weight: bold; color: #0f766e; border-bottom: 1px solid #99f6e4; padding-bottom: 3px; margin-bottom: 6px;">⚛️ Beamline & Usage Condition</div>
+      <table style="border-collapse: collapse; font-size: 12px; color: #1f2937;">
+        <tr><td style="padding: 1px 12px 1px 0; font-weight: bold; color: #0f766e;">Facility</td><td>: ${escapeHtml(fac)}</td></tr>
+        <tr><td style="padding: 1px 12px 1px 0; font-weight: bold; color: #0f766e;">Beamline</td><td>: ${escapeHtml(bl)}</td></tr>
+        <tr><td style="padding: 1px 12px 1px 0; font-weight: bold; color: #0f766e;">Energy filter</td><td>: ${escapeHtml(fil)}</td></tr>
+        <tr><td style="padding: 1px 12px 1px 0; font-weight: bold; color: #0f766e;">Energy</td><td>: ${escapeHtml(ene)} keV</td></tr>
+        <tr><td style="padding: 1px 12px 1px 0; font-weight: bold; color: #0f766e;">Method</td><td>: ${escapeHtml(met)}</td></tr>
+        <tr><td style="padding: 1px 12px 1px 0; font-weight: bold; color: #0f766e;">Group</td><td>: ${escapeHtml(grp)}</td></tr>
+      </table>
+    </div>
+    <div><br></div>
+  `;
 
   const editor = document.getElementById('editor');
   editor.focus();
-  document.execCommand('insertText', false, textToInsert);
+  document.execCommand('insertHTML', false, boxHtml);
   closeInitModal();
   onEditorInput();
 
@@ -483,7 +495,7 @@ async function insertSRInfo() {
     ['beamline', bl],
     ['filter', fil],
     ['method', met],
-    ['member', mem]
+    ['group', grp]
   ];
 
   pairs.forEach(([key, val]) => {
@@ -511,7 +523,6 @@ async function insertSRInfo() {
     console.warn("SR Info 設定保存失敗:", err);
   }
 }
-
 // ==========================================
 // 🔍 ログ検索モーダル制御
 // ==========================================
@@ -789,44 +800,225 @@ function SB_ListClick() { document.execCommand('insertUnorderedList', false, nul
 function SB_OrderedListClick() { document.execCommand('insertOrderedList', false, null); onEditorInput(); }
 function SB_SeparateClick() { document.execCommand('insertText', false, '********************************\n'); onEditorInput(); }
 
-function SB_Pen_ColorClick() {
-  const isDark = document.body.classList.contains('dark-mode');
-  const defaultColor = isDark ? '#d4d4d4' : '#111827';
-  const currentColor = document.queryCommandValue('foreColor');
-  const isCurrentlyRed = currentColor.includes('255, 0, 0') || currentColor.toLowerCase() === '#ff0000' || currentColor === 'red';
-  document.execCommand('foreColor', false, isCurrentlyRed ? defaultColor : 'red');
+// ==========================================
+// 🎨 文字色カラーマップ制御
+// ==========================================
+let savedColorRange = null;
+
+function saveSelectionForColor() {
+  const editor = document.getElementById('editor');
+  const sel = window.getSelection();
+  if (editor && sel && sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
+    savedColorRange = sel.getRangeAt(0).cloneRange();
+  }
+}
+
+function toggleColorPalette(e) {
+  if (e) e.stopPropagation();
+  const popup = document.getElementById('colorPalettePopup');
+  if (!popup) return;
+
+  if (popup.classList.contains('hidden')) {
+    saveSelectionForColor();
+    popup.classList.remove('hidden');
+  } else {
+    popup.classList.add('hidden');
+  }
+}
+
+function closeColorPalette() {
+  const popup = document.getElementById('colorPalettePopup');
+  if (popup && !popup.classList.contains('hidden')) {
+    popup.classList.add('hidden');
+  }
+}
+
+function applyTextColor(colorHex, shouldClose = true) {
+  const editor = document.getElementById('editor');
+  if (editor) {
+    editor.focus();
+    // ネイティブカラーピッカー操作で選択範囲が外れていたら復元
+    if (savedColorRange) {
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(savedColorRange);
+    }
+  }
+
+  document.execCommand('foreColor', false, colorHex);
+
+  // 適用後の選択範囲を再記憶（連続ドラッグ変更用）
+  saveSelectionForColor();
+
+  // ボタン下部のインジケーターバーを選択色に更新
+  const bar = document.getElementById('btn_color_bar');
+  if (bar) bar.style.backgroundColor = colorHex;
+
+  if (shouldClose) {
+    closeColorPalette();
+  }
   updateToolbarFormatState();
   onEditorInput();
 }
 
-function SB_HighlightClick() {
-  const currentBg = document.queryCommandValue('hiliteColor') || document.queryCommandValue('backColor');
-  const isHighlighted = currentBg.includes('255, 255, 0') || currentBg === 'yellow';
-  document.execCommand('hiliteColor', false, isHighlighted ? 'transparent' : 'yellow');
+function resetTextColor() {
+  const editor = document.getElementById('editor');
+  if (editor) editor.focus();
+
+  const isDark = document.body.classList.contains('dark-mode');
+  const defaultColor = isDark ? '#d4d4d4' : '#111827';
+  document.execCommand('foreColor', false, defaultColor);
+
+  const bar = document.getElementById('btn_color_bar');
+  if (bar) bar.style.backgroundColor = defaultColor;
+
+  closeColorPalette();
   updateToolbarFormatState();
   onEditorInput();
 }
+
+// ==========================================
+// 🖊 マーカー（ハイライト）カラーマップ制御
+// ==========================================
+function toggleHighlightPalette(e) {
+  if (e) e.stopPropagation();
+  closeColorPalette(); // 文字色パレットが開いていれば閉じる
+  const popup = document.getElementById('highlightPalettePopup');
+  if (!popup) return;
+
+  if (popup.classList.contains('hidden')) {
+    saveSelectionForColor();
+    popup.classList.remove('hidden');
+  } else {
+    popup.classList.add('hidden');
+  }
+}
+
+function closeHighlightPalette() {
+  const popup = document.getElementById('highlightPalettePopup');
+  if (popup && !popup.classList.contains('hidden')) {
+    popup.classList.add('hidden');
+  }
+}
+
+function applyHighlightColor(colorHex, shouldClose = true) {
+  const editor = document.getElementById('editor');
+  if (editor) {
+    editor.focus();
+    if (savedColorRange) {
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(savedColorRange);
+    }
+  }
+
+  document.execCommand('hiliteColor', false, colorHex);
+  saveSelectionForColor();
+
+  const bar = document.getElementById('btn_highlight_bar');
+  if (bar) bar.style.backgroundColor = colorHex;
+
+  if (shouldClose) {
+    closeHighlightPalette();
+  }
+  updateToolbarFormatState();
+  onEditorInput();
+}
+
+function resetHighlightColor() {
+  const editor = document.getElementById('editor');
+  if (editor) editor.focus();
+
+  document.execCommand('hiliteColor', false, 'transparent');
+
+  const bar = document.getElementById('btn_highlight_bar');
+  if (bar) bar.style.backgroundColor = 'transparent';
+
+  closeHighlightPalette();
+  updateToolbarFormatState();
+  onEditorInput();
+}
+
+// パレット外クリックで閉じる（文字色・マーカー両方対応）
+document.addEventListener('click', (e) => {
+  const colorWrapper = document.getElementById('colorPickerWrapper');
+  if (colorWrapper && !colorWrapper.contains(e.target)) {
+    closeColorPalette();
+  }
+  const hlWrapper = document.getElementById('highlightPickerWrapper');
+  if (hlWrapper && !hlWrapper.contains(e.target)) {
+    closeHighlightPalette();
+  }
+  const boxWrapper = document.getElementById('boxPickerWrapper');
+  if (boxWrapper && !boxWrapper.contains(e.target)) {
+    closeBoxPalette();
+  }
+});
 
 function updateToolbarFormatState() {
   const editor = document.getElementById('editor');
   const sel = window.getSelection();
   if (!sel || !sel.anchorNode || !editor.contains(sel.anchorNode)) return;
 
-  // 🌟 ここを追加: カーソル位置の実際のフォントサイズを Edit_Size に反映
+  // カーソル位置の実際のフォントサイズと文字色をツールバーに反映
   try {
     let node = sel.anchorNode;
     if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
     if (node && editor.contains(node)) {
       const computed = window.getComputedStyle(node);
+
+      // 1. フォントサイズの反映
       const pxVal = parseFloat(computed.fontSize);
       if (pxVal) {
-        // px -> pt 換算 (1pt ≈ 1.333px, pt = px * 0.75)
         const ptVal = Math.round(pxVal * 0.75);
         const editSize = document.getElementById('Edit_Size');
         if (editSize && ptVal) {
           editSize.value = ptVal;
         }
       }
+
+      // 2. 文字色のリアルタイム反映（Aボタンの下線バー）
+      if (computed.color) {
+        const colorBar = document.getElementById('btn_color_bar');
+        if (colorBar) {
+          colorBar.style.backgroundColor = computed.color;
+        }
+      }
+
+      // 3. ★ マーカー色のリアルタイム反映（🖊ボタンの下線バー）
+      const hlBar = document.getElementById('btn_highlight_bar');
+      if (hlBar) {
+        let detectedBg = 'transparent';
+        let curr = node;
+        while (curr && curr !== editor) {
+          const bg = window.getComputedStyle(curr).backgroundColor;
+          if (bg && bg !== 'transparent' && bg !== 'rgba(0, 0, 0, 0)') {
+            detectedBg = bg;
+            break;
+          }
+          curr = curr.parentElement;
+        }
+        hlBar.style.backgroundColor = detectedBg;
+      }
+      
+      // 4. ★ ボックス色のリアルタイム反映（▭ボタンの下線バー）
+      const boxBar = document.getElementById('btn_box_bar');
+      if (boxBar) {
+        let detectedBoxColor = (typeof currentBoxBorderColor !== 'undefined') ? currentBoxBorderColor : '#0d9488';
+        let curr = node;
+        while (curr && curr !== editor) {
+          if (curr.classList && curr.classList.contains('box-wrapper')) {
+            const bColor = window.getComputedStyle(curr).borderLeftColor;
+            if (bColor && bColor !== 'transparent' && bColor !== 'rgba(0, 0, 0, 0)') {
+              detectedBoxColor = bColor;
+            }
+            break;
+          }
+          curr = curr.parentElement;
+        }
+        boxBar.style.backgroundColor = detectedBoxColor;
+      }      
+
     }
   } catch (e) {}
 
@@ -895,31 +1087,84 @@ function SB_TimeClick() {
   }
 }
 
-function toggleBoxWrapper() {
-  const sel = window.getSelection();
-  if (!sel || !sel.rangeCount) return;
-  const editor = document.getElementById('editor');
-  let node = sel.anchorNode;
-  if (!node || !editor.contains(node)) return;
+// ==========================================
+// ▭ ボックス（枠囲み）カラーマップ制御
+// ==========================================
+let currentBoxBorderColor = '#0d9488';
+let currentBoxBgColor = '#f0fdfa';
 
-  let existingBox = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
-  while (existingBox && existingBox !== editor) {
-    if (existingBox.classList && existingBox.classList.contains('box-wrapper')) break;
-    existingBox = existingBox.parentElement;
+function getCurrentBoxWrapper() {
+  const editor = document.getElementById('editor');
+  const sel = window.getSelection();
+  if (!editor || !sel || !sel.rangeCount) return null;
+  let node = sel.anchorNode;
+  if (!node || !editor.contains(node)) return null;
+
+  let curr = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+  while (curr && curr !== editor) {
+    if (curr.classList && curr.classList.contains('box-wrapper')) return curr;
+    curr = curr.parentElement;
+  }
+  return null;
+}
+
+function toggleBoxPalette(e) {
+  if (e) e.stopPropagation();
+  closeColorPalette();
+  closeHighlightPalette();
+  const popup = document.getElementById('boxPalettePopup');
+  if (!popup) return;
+
+  if (popup.classList.contains('hidden')) {
+    saveSelectionForColor();
+    popup.classList.remove('hidden');
+  } else {
+    popup.classList.add('hidden');
+  }
+}
+
+function closeBoxPalette() {
+  const popup = document.getElementById('boxPalettePopup');
+  if (popup && !popup.classList.contains('hidden')) {
+    popup.classList.add('hidden');
+  }
+}
+
+function applyBoxColor(borderColor, bgColor, shouldClose = true) {
+  const editor = document.getElementById('editor');
+  if (!editor) return;
+  editor.focus();
+
+  if (savedColorRange) {
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(savedColorRange);
   }
 
-  if (existingBox && existingBox !== editor && existingBox.classList.contains('box-wrapper')) {
-    const parent = existingBox.parentNode;
-    while (existingBox.firstChild) parent.insertBefore(existingBox.firstChild, existingBox);
-    parent.removeChild(existingBox);
+  currentBoxBorderColor = borderColor;
+  currentBoxBgColor = bgColor;
+
+  const bar = document.getElementById('btn_box_bar');
+  if (bar) bar.style.backgroundColor = borderColor;
+
+  // すでにボックス内にカーソルがある場合は、そのボックスの色だけを変更
+  const existingBox = getCurrentBoxWrapper();
+  if (existingBox) {
+    existingBox.style.borderLeftColor = borderColor;
+    existingBox.style.backgroundColor = bgColor;
+    if (shouldClose) closeBoxPalette();
     onEditorInput();
     return;
   }
 
+  // 新規ボックスを作成して挿入
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return;
   const range = sel.getRangeAt(0);
+
   const box = document.createElement('div');
   box.className = 'box-wrapper';
-  box.style.cssText = 'border-left: 4px solid #0d9488; background-color: #f0fdfa; padding: 8px 12px; margin: 8px 0; font-family: monospace; font-size: 13px; line-height: 1.5; color: #1f2937; border-radius: 2px;';
+  box.style.cssText = `border-left: 4px solid ${borderColor}; background-color: ${bgColor}; padding: 8px 12px; margin: 8px 0; font-family: monospace; font-size: 13px; line-height: 1.5; color: #1f2937; border-radius: 2px;`;
 
   if (range.collapsed) {
     box.innerHTML = 'テキストを入力...';
@@ -928,7 +1173,46 @@ function toggleBoxWrapper() {
     box.appendChild(range.extractContents());
     range.insertNode(box);
   }
+
+  // 作成したボックスの直後にカーソルを合わせ、色ピッカー連続操作にも対応
+  const newRange = document.createRange();
+  newRange.selectNodeContents(box);
+  sel.removeAllRanges();
+  sel.addRange(newRange);
+  saveSelectionForColor();
+
+  if (shouldClose) closeBoxPalette();
   onEditorInput();
+}
+
+// 🎨 カスタムカラー選択時は、選んだ濃色から淡いパステル背景色を自動計算
+function applyCustomBoxColor(hexColor, shouldClose = true) {
+  const r = parseInt(hexColor.slice(1, 3), 16);
+  const g = parseInt(hexColor.slice(3, 5), 16);
+  const b = parseInt(hexColor.slice(5, 7), 16);
+  // 白(255)を92%ブレンドして読みやすい淡色背景を生成
+  const lr = Math.round(r + (255 - r) * 0.92);
+  const lg = Math.round(g + (255 - g) * 0.92);
+  const lb = Math.round(b + (255 - b) * 0.92);
+  const lightBg = `#${lr.toString(16).padStart(2, '0')}${lg.toString(16).padStart(2, '0')}${lb.toString(16).padStart(2, '0')}`;
+
+  applyBoxColor(hexColor, lightBg, shouldClose);
+}
+
+function unwrapCurrentBox() {
+  const editor = document.getElementById('editor');
+  if (editor) editor.focus();
+
+  const existingBox = getCurrentBoxWrapper();
+  if (existingBox) {
+    const parent = existingBox.parentNode;
+    while (existingBox.firstChild) {
+      parent.insertBefore(existingBox.firstChild, existingBox);
+    }
+    parent.removeChild(existingBox);
+    onEditorInput();
+  }
+  closeBoxPalette();
 }
 
 function toggleDarkMode() {
@@ -980,6 +1264,22 @@ function escapeHtml(str) {
 // ==========================================
 // アカウント管理
 // ==========================================
+function updateAccountAvatarBadge(accountName) {
+  const badge = document.getElementById('account_avatar_badge');
+  if (!badge) return;
+
+  const name = (accountName && typeof accountName === 'string') ? accountName.trim() : 'default';
+  badge.textContent = name.charAt(0).toUpperCase();
+
+  // アカウント名の文字列から安定したカラーパレットを自動割り当て
+  const palette = ['#0d9488', '#2563eb', '#059669', '#d97706', '#7c3aed'];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  badge.style.backgroundColor = palette[Math.abs(hash) % palette.length];
+}
+
 async function loadAccountsList() {
   const sel = document.getElementById('sel_account');
   if (!sel) return;
@@ -1002,6 +1302,7 @@ async function loadAccountsList() {
       current = accounts[0];
     }
     currentAccountName = current;
+    updateAccountAvatarBadge(currentAccountName);
 
     sel.innerHTML = '';
     accounts.forEach(acc => {
@@ -1046,6 +1347,7 @@ async function handleAccountChange(selectedVal) {
     });
     if (!res.ok) throw new Error("切替に失敗しました");
     currentAccountName = selectedVal;
+    updateAccountAvatarBadge(currentAccountName);
     await refreshLogDates();
     await loadLogForDate(currentDate);
     document.getElementById('statusText').textContent = `アカウント切替: ${selectedVal}`;
@@ -1125,20 +1427,27 @@ async function openOptionModal() {
     document.getElementById('opt_backup_on_exit').checked = !!cfg.backup_on_exit;
     document.getElementById('opt_backup_dest_dir').value = cfg.backup_dest_dir || '';
 
-    // Ring
-    document.getElementById('opt_ring_facility').value = cfg.ring_facility || 'SAGA-LS';
-    document.getElementById('opt_ring_url_sagals').value = cfg.ring_url_sagals || 'https://www.saga-ls.jp/acc/accstatus.jpg';
-    document.getElementById('opt_ring_url_spring8').value = cfg.ring_url_spring8 || 'https://spring8.jp/status/sr_status_en.png';
-    document.getElementById('opt_ring_url_pf').value = cfg.ring_url_pf || 'https://www-pfring.kek.jp/PF/status/pf_status.png';
+    // Ring（古い opt_ring_url_sagals 等への代入は削除し、新形式リストへ渡す）
+    let ringFacilities = cfg.ring_facilities;
+    if (!Array.isArray(ringFacilities) || ringFacilities.length === 0) {
+      ringFacilities = [
+        { name: "SAGA-LS", url: cfg.ring_url_sagals || "https://www.saga-ls.jp/acc/accstatus.jpg" },
+        { name: "SPring-8", url: cfg.ring_url_spring8 || "https://spring8.jp/status/sr_status_en.png" },
+        { name: "PF", url: cfg.ring_url_pf || "https://www-pfring.kek.jp/PF/status/pf_status.png" }
+      ];
+    }
+    renderRingFacilityList(ringFacilities, cfg.ring_facility || "SAGA-LS");
 
   } catch (e) {
     console.warn("Config load failed", e);
+    renderRingFacilityList(null, "SAGA-LS");
   }
 
   document.getElementById('modalOption').classList.remove('hidden');
   if (typeof setAppLanguage === 'function') {
     setAppLanguage(typeof currentAppLanguage !== 'undefined' ? currentAppLanguage : 'ja', false);
   }
+  updateRingTabI18n();
 }
 
 function closeOptionModal() {
@@ -1149,6 +1458,19 @@ async function saveOptionModal() {
   const autoSaveMin = Math.max(1, parseInt(document.getElementById('opt_auto_save_min').value, 10) || 5);
   const langEl = document.getElementById('opt_language');
   const selectedLang = (langEl && langEl.value) ? langEl.value : 'ja';
+
+  const ringRows = document.querySelectorAll('#ringFacilityListContainer .ring-facility-row');
+  const ringFacilities = [];
+  ringRows.forEach(row => {
+    const name = row.querySelector('.ring-fac-name').value.trim();
+    const url = row.querySelector('.ring-fac-url').value.trim();
+    if (name) {
+      ringFacilities.push({ name, url });
+    }
+  });
+
+  const activeRingName = document.getElementById('opt_ring_facility').value;
+  const activeRingObj = ringFacilities.find(f => f.name === activeRingName) || ringFacilities[0] || { name: "", url: "" };
 
   const cfg = {
     account_name: currentAccountName,
@@ -1161,10 +1483,10 @@ async function saveOptionModal() {
     backup_on_exit: document.getElementById('opt_backup_on_exit').checked,
     backup_dest_dir: document.getElementById('opt_backup_dest_dir').value.trim(),
 
-    ring_facility: document.getElementById('opt_ring_facility').value,
-    ring_url_sagals: document.getElementById('opt_ring_url_sagals').value,
-    ring_url_spring8: document.getElementById('opt_ring_url_spring8').value,
-    ring_url_pf: document.getElementById('opt_ring_url_pf').value
+    // Ring 新形式（リスト）＆ 選択中施設のURLを直接参照用にも保存
+    ring_facility: activeRingObj.name,
+    ring_url: activeRingObj.url,
+    ring_facilities: ringFacilities
   };
 
   try {
@@ -1186,6 +1508,141 @@ async function saveOptionModal() {
   }
 }
 
+
+// ==========================================
+// 💍 Ring 施設リスト動的編集ヘルパー（SAGA-LS 固定 ＋ 追加施設編集・日英対応）
+// ==========================================
+const FIXED_SAGA_LS = {
+  name: "SAGA-LS",
+  url: "https://www.saga-ls.jp/acc/accstatus.jpg"
+};
+
+const DEFAULT_EXTRA_FACILITIES = [
+  { name: "SPring-8", url: "https://spring8.jp/status/sr_status_en.png" },
+  { name: "PF", url: "https://www-pfring.kek.jp/PF/status/pf_status.png" }
+];
+
+function updateRingTabI18n() {
+  const isEn = (typeof currentAppLanguage !== 'undefined' && currentAppLanguage === 'en');
+
+  const lblActive = document.getElementById('lbl_ring_active');
+  if (lblActive) lblActive.textContent = isEn ? "💍 Active Facility" : "💍 使用施設 (Active Facility)";
+
+  const lblTitle = document.getElementById('lbl_ring_list_title');
+  if (lblTitle) lblTitle.textContent = isEn ? "Registered Facilities (Name / Status Image URL)" : "登録施設リスト（施設名 / ステータス画像URL）";
+
+  const btnAdd = document.getElementById('btn_add_ring_facility');
+  if (btnAdd) btnAdd.textContent = isEn ? "+ Add Facility" : "+ 施設を追加";
+
+  // 既に描画済みの追加行の placeholder / title も更新
+  document.querySelectorAll('#ringFacilityListContainer .ring-fac-name:not([readonly])').forEach(inp => {
+    inp.placeholder = isEn ? "Name (e.g. ESRF)" : "施設名 (例: ESRF)";
+  });
+  document.querySelectorAll('#ringFacilityListContainer .ring-del-btn').forEach(btn => {
+    btn.title = isEn ? "Remove" : "削除";
+  });
+  document.querySelectorAll('#ringFacilityListContainer .ring-lock-icon').forEach(sp => {
+    sp.title = isEn ? "SAGA-LS Default (Fixed)" : "SAGA-LS 標準固定";
+  });
+}
+
+function renderRingFacilityList(facilities, activeName) {
+  const container = document.getElementById('ringFacilityListContainer');
+  if (!container) return;
+  container.innerHTML = '';
+
+  // 1行目: SAGA-LS を固定で追加
+  addRingFacilityRow(FIXED_SAGA_LS.name, FIXED_SAGA_LS.url, false, true);
+
+  // 2行目以降: SAGA-LS 以外の施設を描画
+  const extras = (Array.isArray(facilities) && facilities.length > 0)
+    ? facilities.filter(item => item.name !== FIXED_SAGA_LS.name)
+    : JSON.parse(JSON.stringify(DEFAULT_EXTRA_FACILITIES));
+
+  extras.forEach((item) => {
+    addRingFacilityRow(item.name, item.url, false, false);
+  });
+
+  syncActiveRingFacilitySelect(activeName || FIXED_SAGA_LS.name);
+  updateRingTabI18n();
+}
+
+function addRingFacilityRow(name = "", url = "", shouldSync = true, isFixed = false) {
+  const container = document.getElementById('ringFacilityListContainer');
+  if (!container) return;
+
+  const isEn = (typeof currentAppLanguage !== 'undefined' && currentAppLanguage === 'en');
+  const row = document.createElement('div');
+  row.className = isFixed
+    ? "ring-facility-row flex items-center space-x-1 bg-teal-50/70 p-1 rounded border border-teal-300"
+    : "ring-facility-row flex items-center space-x-1 bg-white p-1 rounded border border-gray-300";
+
+  if (isFixed) {
+    const lockTip = isEn ? "SAGA-LS Default (Fixed)" : "SAGA-LS 標準固定";
+    row.innerHTML = `
+      <input type="text" readonly value="${escapeHtml(name)}"
+        class="ring-fac-name w-24 border border-teal-200 bg-teal-100/60 text-teal-900 rounded px-1.5 py-0.5 text-xs font-bold outline-none cursor-default">
+      <input type="text" readonly value="${escapeHtml(url)}"
+        class="ring-fac-url flex-1 border border-teal-200 bg-teal-100/60 text-teal-800 rounded px-1.5 py-0.5 text-xs font-mono outline-none cursor-default">
+      <span title="${lockTip}" class="ring-lock-icon w-5 h-5 flex items-center justify-center text-teal-600 text-[11px] select-none">🔒</span>
+    `;
+  } else {
+    const namePh = isEn ? "Name (e.g. ESRF)" : "施設名 (例: ESRF)";
+    const delTip = isEn ? "Remove" : "削除";
+    row.innerHTML = `
+      <input type="text" placeholder="${namePh}" value="${escapeHtml(name)}"
+        oninput="syncActiveRingFacilitySelect()"
+        class="ring-fac-name w-24 border border-gray-300 rounded px-1.5 py-0.5 text-xs font-bold outline-none focus:border-teal-500">
+      <input type="text" placeholder="https://.../status.png" value="${escapeHtml(url)}"
+        class="ring-fac-url flex-1 border border-gray-300 rounded px-1.5 py-0.5 text-xs font-mono outline-none focus:border-teal-500">
+      <button type="button" onclick="removeRingFacilityRow(this)" title="${delTip}"
+        class="ring-del-btn w-5 h-5 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 rounded font-bold text-xs">✕</button>
+    `;
+  }
+
+  container.appendChild(row);
+  if (shouldSync) {
+    syncActiveRingFacilitySelect();
+    container.scrollTop = container.scrollHeight;
+  }
+}
+
+function removeRingFacilityRow(btn) {
+  const row = btn.closest('.ring-facility-row');
+  if (row) {
+    row.remove();
+    syncActiveRingFacilitySelect();
+  }
+}
+
+function syncActiveRingFacilitySelect(preferredActive = null) {
+  const sel = document.getElementById('opt_ring_facility');
+  const container = document.getElementById('ringFacilityListContainer');
+  if (!sel || !container) return;
+
+  const currentVal = preferredActive !== null ? preferredActive : sel.value;
+  const nameInputs = container.querySelectorAll('.ring-fac-name');
+
+  sel.innerHTML = '';
+  let matched = false;
+
+  nameInputs.forEach(inp => {
+    const val = inp.value.trim();
+    if (!val) return;
+    const opt = document.createElement('option');
+    opt.value = val;
+    opt.textContent = val;
+    if (val === currentVal) {
+      opt.selected = true;
+      matched = true;
+    }
+    sel.appendChild(opt);
+  });
+
+  if (!matched && sel.options.length > 0) {
+    sel.options[0].selected = true;
+  }
+}
 // ==========================================
 // 🚀 アプリケーション統合初期化リスナー (DOMContentLoaded)
 // ==========================================
@@ -1801,6 +2258,8 @@ function switchOptionTab(tabName) {
   if (typeof setAppLanguage === 'function') {
     setAppLanguage(typeof currentAppLanguage !== 'undefined' ? currentAppLanguage : 'ja', false);
   }
+
+  updateRingTabI18n();
 }
 
 async function pickHelpFile() {
@@ -1957,16 +2416,16 @@ async function checkLatestLogOnActivate() {
     }
 
     // 編集中（未保存）の入力が衝突する場合のみ確認ダイアログを出す
-    if (isModified) {
-      const confirmMsg = isEn
-        ? "A newer version of this log was updated elsewhere.\nDiscard current unsaved edits and load the latest version?"
-        : "別の場所または端末で更新された最新ログが見つかりました。\n現在の編集内容を破棄して最新版を読み込みますか？";
-      const ok = confirm(confirmMsg);
-      if (!ok) {
-        lastSyncedMtime = st.mtime;
-        return;
-      }
-    }
+    //if (isModified) {
+    //  const confirmMsg = isEn
+    //    ? "A newer version of this log was updated elsewhere.\nDiscard current unsaved edits and load the latest version?"
+    //    : "別の場所または端末で更新された最新ログが見つかりました。\n現在の編集内容を破棄して最新版を読み込みますか？";
+    //  const ok = confirm(confirmMsg);
+    //  if (!ok) {
+    //    lastSyncedMtime = st.mtime;
+    //    return;
+    //  }
+    //}
 
     // 最新版をエディタへ反映
     editor.innerHTML = newHtml;
