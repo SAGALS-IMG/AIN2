@@ -1,6 +1,11 @@
 import os
 import re
 import json
+
+import time
+import shutil
+import threading
+
 import urllib.request
 import urllib.parse
 import urllib.error
@@ -41,14 +46,42 @@ def get_eli_config_file(paths: AccountPaths) -> Path:
     eli_dir.mkdir(parents=True, exist_ok=True)
     return eli_dir / "config.json"
 
+_eli_lock = threading.Lock()
+ELI_KEYS = {"ai_url", "ai_url_history", "ai_api_key", "ai_server_type", "ai_model",
+            "ai_temp", "ai_timeout", "ai_system_prompt", "elog_format_prompt"}
+
+def _read_eli_raw(cfg_file: Path):
+    for _ in range(3):
+        try:
+            return json.loads(cfg_file.read_text(encoding="utf-8-sig"))
+        except Exception:
+            time.sleep(0.05)
+    return None
+
+def _atomic_write_text(path: Path, text: str):
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(text)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except Exception:
+        if tmp.exists():
+            tmp.unlink()
+        raise
+
 def load_eli_config(account: Optional[str] = None) -> dict:
     acc = account or get_app_state().get("current_account", "default")
     paths = AccountPaths(acc)
     cfg_file = get_eli_config_file(paths)
     
     if cfg_file.exists():
+        data = _read_eli_raw(cfg_file)
+        if isinstance(data, dict):
+            return data
         try:
-            return json.loads(cfg_file.read_text(encoding="utf-8"))
+            shutil.copy2(cfg_file, cfg_file.with_suffix(f".broken.{int(time.time())}"))
         except Exception:
             pass
 
@@ -71,14 +104,24 @@ def load_eli_config(account: Optional[str] = None) -> dict:
         )),
         "elog_format_prompt": legacy_cfg.get("elog_format_prompt", "")
     }
-    save_eli_config(default_cfg, acc)
+    if not cfg_file.exists():
+        save_eli_config(default_cfg, acc)
     return default_cfg
 
 def save_eli_config(cfg: dict, account: Optional[str] = None):
     acc = account or get_app_state().get("current_account", "default")
     paths = AccountPaths(acc)
     cfg_file = get_eli_config_file(paths)
-    cfg_file.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+    with _eli_lock:
+        current = {}
+        if cfg_file.exists():
+            current = _read_eli_raw(cfg_file)
+            if not isinstance(current, dict):
+                raise HTTPException(status_code=500, detail="Eli設定ファイルを読み込めないため保存を中止しました")
+        for k, v in cfg.items():
+            if k in ELI_KEYS:
+                current[k] = v
+        _atomic_write_text(cfg_file, json.dumps(current, ensure_ascii=False, indent=2))
 
 @router.get("/config")
 def get_config_api(account: Optional[str] = None):
@@ -405,7 +448,10 @@ def save_elog_api(payload: ElogSavePayload):
     out_file = paths.elog_dir / f"{payload.date_str}_elog.md"
     tmp_file = out_file.with_suffix(f".tmp.{os.getpid()}")
     try:
-        tmp_file.write_text(payload.markdown, encoding="utf-8")
+        with open(tmp_file, "w", encoding="utf-8") as f:
+            f.write(payload.markdown)
+            f.flush()
+            os.fsync(f.fileno())
         tmp_file.replace(out_file)
         return {"status": "ok", "saved_path": str(out_file.resolve()), "account": paths.account}
     except Exception as e:

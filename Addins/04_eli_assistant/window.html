@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Eli - Experiment Assistant</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/static/js/tailwindcss.js"></script>
   <style>
     .hidden { display: none !important; }
     body { user-select: none; }
@@ -158,8 +158,7 @@
         <label class="font-bold text-gray-700 text-[11px]">🪄 整形・抽出用プロンプト</label>
         <button onclick="resetDefaultFormatPrompt()" class="text-[11px] text-teal-600 hover:underline">デフォルトに戻す</button>
       </div>
-      <textarea id="elog_format_prompt" class="flex-1 w-full border border-gray-300 p-2 rounded bg-[#fdfbf7] text-[11px] font-mono leading-relaxed outline-none resize-none focus:border-teal-600"></textarea>
-    </div>
+      <textarea id="elog_format_prompt" oninput="scheduleFormatPromptSave()" class="flex-1 w-full border border-gray-300 p-2 rounded bg-[#fdfbf7] text-[11px] font-mono leading-relaxed outline-none resize-none focus:border-teal-600"></textarea>    </div>
 
     <div id="formatSplitter" class="h-2 w-full my-1 flex items-center justify-center cursor-row-resize hover:bg-teal-200 active:bg-teal-400 rounded transition-colors select-none shrink-0">
       <div class="w-12 h-1 bg-gray-400 rounded-full"></div>
@@ -568,7 +567,7 @@ Frontmatter（日付、施設、BL、Energy、手法）と、
     // 初期化 (安全に段階実行)
     // ==========================================
 
-let currentLang = 'ja';
+    //let currentLang = 'ja';
 
     const ELI_I18N_MAP = {
       // ヘッダー・タブ
@@ -995,8 +994,30 @@ let currentLang = 'ja';
     function sendTextToMainWindow(text) {
       addinBridge.postMessage({ action: 'insert_text', text: text });
     }
+
+    let formatPromptSaveTimer = null;
+    function scheduleFormatPromptSave() {
+      if (formatPromptSaveTimer) clearTimeout(formatPromptSaveTimer);
+      formatPromptSaveTimer = setTimeout(saveFormatPrompt, 800);
+    }
+
+    async function saveFormatPrompt() {
+      formatPromptSaveTimer = null;
+      try {
+        await fetch(`${API_ADDIN}/rag/save_format_prompt`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            account: currentAccount,
+            prompt: document.getElementById('elog_format_prompt').value
+          })
+        });
+      } catch (e) {}
+    }
+
     function resetDefaultFormatPrompt() {
       document.getElementById('elog_format_prompt').value = DEFAULT_ELOG_PROMPT;
+      scheduleFormatPromptSave();
     }
 
     // 📁 ログ選択ダイアログ
