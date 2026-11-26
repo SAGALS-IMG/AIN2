@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>AILab_Note (AIN2)</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/static/js/tailwindcss.js"></script>
   <script src="/static/js/ain_i18n.js"></script>
   <script src="/static/js/ain_calc_engine.js"></script>
   <script src="/static/js/ain_canvas.js"></script>
@@ -144,7 +144,7 @@
         <button onclick="triggerImageCapture()" title="カメラ撮影 / 画像挿入" class="w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded text-xs">📷</button>
         <input id="cameraInput" type="file" accept="image/*" class="hidden" onchange="handleImageSelected(event)">
 
-        <button onclick="SB_SaveClick(true)" title="ログを保存" class="h-6 px-1.5 hover:bg-gray-300 rounded flex items-center text-gray-700 font-bold">💾</button>
+        <button onclick="SB_SaveClick(true)" title="ログを保存 (Cmd+S / Ctrl+S)" class="h-6 px-1.5 hover:bg-gray-300 rounded flex items-center text-gray-700 font-bold">💾</button>
 
         <div class="w-[2px] h-4 bg-gray-400 mx-1"></div>
 
@@ -157,6 +157,26 @@
         <button id="btn_superscript" onmousedown="event.preventDefault()" onclick="SB_SuperScriptClick()" title="上付き文字" class="w-6 h-6 flex items-center justify-center font-mono font-bold hover:bg-gray-300 rounded text-xs text-gray-700">x²</button>
         <button id="btn_subscript" onmousedown="event.preventDefault()" onclick="SB_SubScriptClick()" title="下付き文字" class="w-6 h-6 flex items-center justify-center font-mono font-bold hover:bg-gray-300 rounded text-xs text-gray-700">x₂</button>
         
+
+        <div class="w-[2px] h-4 bg-gray-400 mx-1"></div>
+
+        <!-- フォントサイズ変更（プルダウン） -->
+        <select id="sel_font_size" onchange="applyFontSize(this.value)" title="フォントサイズ (pt)"
+          class="h-6 px-1 bg-white border border-gray-400 rounded text-[11px] font-bold text-gray-700 outline-none cursor-pointer">
+          <option value="8">8 pt</option>
+          <option value="9">9 pt</option>
+          <option value="10">10 pt</option>
+          <option value="11">11 pt</option>
+          <option value="12" selected>12 pt</option>
+          <option value="14">14 pt</option>
+          <option value="16">16 pt</option>
+          <option value="18">18 pt</option>
+          <option value="20">20 pt</option>
+          <option value="24">24 pt</option>
+          <option value="28">28 pt</option>
+          <option value="36">36 pt</option>
+        </select>
+
         <!-- 文字色カラーパレット -->
         <div class="relative inline-block" id="colorPickerWrapper">
           <button id="btn_color" onmousedown="event.preventDefault()" onclick="toggleColorPalette(event)" title="文字色" class="relative w-6 h-6 flex items-center justify-center font-bold hover:bg-gray-300 rounded">
@@ -341,21 +361,19 @@
           </div>
         </div>
 
-        <button onclick="SB_SeparateClick()" title="区切り線" class="w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded">…</button>
 
-        <div class="w-[2px] h-4 bg-gray-400 mx-1"></div>
-
-        <!-- フォントサイズ変更 -->
-        <button onmousedown="event.preventDefault()" onclick="SB_SizeDownClick()" title="Font size down" class="px-1 h-5 flex items-center justify-center hover:bg-gray-300 rounded text-[11px] font-bold text-gray-700">A▼</button>
-        <input id="Edit_Size" type="text" readonly value="12" class="w-7 h-5 text-center bg-[#e9ecef] border border-gray-400 text-[11px] font-bold rounded">
-        <button onmousedown="event.preventDefault()" onclick="SB_SizeUpClick()" title="Font size up" class="px-1 h-5 flex items-center justify-center hover:bg-gray-300 rounded text-[11px] font-bold text-gray-700">A▲</button>
 
         <div class="flex-1"></div>
 
-        <!-- 👤 アカウント選択 -->
-        <div class="flex items-center space-x-1 mr-2">
-          <span id="account_avatar_badge" class="w-4 h-4 rounded-full bg-teal-600 text-white text-[10px] font-bold flex items-center justify-center shadow-2xs">D</span>
-          <select id="sel_account" onchange="handleAccountChange(this.value)" class="h-6 px-1 bg-white border border-gray-400 rounded text-xs font-bold outline-none text-gray-700 cursor-pointer"></select>
+        <!-- 👤 アカウントバッジ ＋ 下向きドロップダウン -->
+        <div class="relative inline-block mr-2" id="accountMenuWrapper">
+          <button type="button" id="account_avatar_badge" onclick="toggleAccountDropdown(event)" title="アカウント切替"
+            class="w-6 h-6 rounded-full bg-teal-600 text-white text-[11px] font-bold flex items-center justify-center shadow-2xs hover:opacity-90 cursor-pointer">D</button>
+
+          <div id="accountDropdownMenu"
+            class="hidden absolute right-0 top-full mt-1 w-44 bg-white border border-gray-300 rounded shadow-xl py-1 z-40 text-xs text-gray-800 select-none">
+            <div id="accountDropdownItems" class="max-h-48 overflow-y-auto divide-y divide-gray-100"></div>
+          </div>
         </div>
 
         <button id="btn_theme" onmousedown="event.preventDefault()" onclick="toggleDarkMode()" title="Dark mode" class="w-6 h-6 flex items-center justify-center hover:bg-gray-300 rounded text-sm">🌓</button>
@@ -733,7 +751,9 @@
       </div>
 
       <div class="font-extrabold text-lg text-gray-900 tracking-tight">AILab_Note (AIN2)</div>
-      <div class="text-[11px] text-teal-700 font-mono font-semibold mb-3">Version 2.3.1 (Modular Edition)</div>
+
+      <div id="app_version_text" class="text-[11px] text-teal-700 font-mono font-semibold mb-3">Version 2.3.1 (Modular Edition)</div>
+
       <div class="w-full text-xs text-gray-600 py-2.5 px-3 border-y border-gray-200 bg-gray-50/60 rounded-md space-y-1.5 text-left mb-4">
         <div class="flex justify-between items-center">
           <span class="text-gray-400 font-medium text-[11px]">Developer:</span>
