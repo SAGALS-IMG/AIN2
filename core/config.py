@@ -99,9 +99,10 @@ def load_account_config(account_name: str = None) -> dict:
     default_cfg = {
         "account_name": paths.account,
         "language": "ja",         
-        "ai_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "ai_url": "",
         "ai_url_history": [
-            "https://generativelanguage.googleapis.com/v1beta/openai"
+            "https://generativelanguage.googleapis.com/v1beta/openai",
+            ""
         ],        
         "ai_server_type": "vLLM (OpenAI)",
         "ai_model": "mistralai/Mistral-Small-24B-Instruct-2501",
@@ -139,14 +140,14 @@ def load_account_config(account_name: str = None) -> dict:
                 "filter": "Si(111)",
                 "energy": "10.0",
                 "method": "Abs CT",
-                "member": ""
+                "group": ""
             },
             "presets": {
                 "facility": ["SAGA-LS", "PF", "PF AR", "SPring-8"],
                 "beamline": ["BL07", "BL-14B", "BL-14C", "BL-20B"],
                 "filter": ["Si(111)", "Si(220)", "Ge(111)", "Metal filter", "none"],
                 "method": ["Abs CT", "micro CT", "Cryo micro CT", "Interferometry CT", "DEI CT", "STXM"],
-                "member": [""]
+                "group": [""]
             }
         }
     }
