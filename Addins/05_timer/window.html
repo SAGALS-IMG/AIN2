@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>AIN - タイマー / ストップウォッチ</title>
+  <script src="/static/js/tailwindcss.js"></script>
+</head>
+<body class="h-screen flex flex-col bg-slate-50 text-gray-800 text-xs p-3 select-none overflow-hidden">
+
+  <!-- モード切替タブ -->
+  <div class="flex border-b border-gray-300 mb-2.5 space-x-1">
+    <button id="tab-timer" onclick="switchMode('timer')"
+      class="flex-1 py-1.5 font-bold rounded-t bg-teal-600 text-white shadow-2xs transition-colors">
+      ⏳ タイマー
+    </button>
+    <button id="tab-sw" onclick="switchMode('stopwatch')"
+      class="flex-1 py-1.5 font-bold rounded-t bg-gray-200 text-gray-600 hover:bg-gray-300 transition-colors">
+      ⏱️ ストップウォッチ
+    </button>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- 1. カウントダウンタイマー画面                 -->
+  <!-- ========================================== -->
+  <div id="view-timer" class="flex-1 flex flex-col justify-between">
+    <!-- メモ/ラベル入力 -->
+    <div class="flex items-center space-x-1.5">
+      <span id="lbl-t-label" class="text-gray-500 font-bold whitespace-nowrap">内容:</span>
+      <input id="timer-label" type="text" placeholder="例: 露光時間 / 試料アニール"
+        class="flex-1 border border-gray-300 bg-white rounded px-2 py-1 text-xs outline-none focus:border-teal-500">
+    </div>
+
+    <!-- デジタル時間表示 -->
+    <div id="timer-display-box" class="my-2 py-4 bg-white border border-gray-300 rounded-xl shadow-inner flex flex-col items-center justify-center transition-colors">
+      <div id="timer-display" class="font-mono text-4xl font-extrabold tracking-wider text-teal-800">05:00</div>
+      <div id="timer-sub" class="text-[10px] text-gray-400 font-mono mt-1">READY</div>
+    </div>
+
+    <!-- 時間設定（時・分・秒） -->
+    <div class="flex items-center justify-center space-x-1.5 bg-white p-2 rounded-lg border border-gray-200">
+      <div class="flex flex-col items-center">
+        <span class="text-[9px] text-gray-400">H</span>
+        <input id="inp-h" type="number" min="0" max="99" value="0" onchange="applyManualInputs()"
+          class="w-12 border border-gray-300 rounded py-1 text-center font-mono font-bold text-sm outline-none focus:border-teal-500">
+      </div>
+      <span class="font-bold text-gray-400 pt-3">:</span>
+      <div class="flex flex-col items-center">
+        <span class="text-[9px] text-gray-400">M</span>
+        <input id="inp-m" type="number" min="0" max="59" value="5" onchange="applyManualInputs()"
+          class="w-12 border border-gray-300 rounded py-1 text-center font-mono font-bold text-sm outline-none focus:border-teal-500">
+      </div>
+      <span class="font-bold text-gray-400 pt-3">:</span>
+      <div class="flex flex-col items-center">
+        <span class="text-[9px] text-gray-400">S</span>
+        <input id="inp-s" type="number" min="0" max="59" value="0" onchange="applyManualInputs()"
+          class="w-12 border border-gray-300 rounded py-1 text-center font-mono font-bold text-sm outline-none focus:border-teal-500">
+      </div>
+    </div>
+
+    <!-- クイックプリセット -->
+    <div class="flex items-center justify-between space-x-1 my-1.5">
+      <button onclick="setTimerPreset(60)" class="flex-1 py-1 bg-white hover:bg-teal-50 border border-gray-300 rounded font-mono text-[11px] font-bold text-gray-700">1m</button>
+      <button onclick="setTimerPreset(180)" class="flex-1 py-1 bg-white hover:bg-teal-50 border border-gray-300 rounded font-mono text-[11px] font-bold text-gray-700">3m</button>
+      <button onclick="setTimerPreset(300)" class="flex-1 py-1 bg-white hover:bg-teal-50 border border-gray-300 rounded font-mono text-[11px] font-bold text-gray-700">5m</button>
+      <button onclick="setTimerPreset(600)" class="flex-1 py-1 bg-white hover:bg-teal-50 border border-gray-300 rounded font-mono text-[11px] font-bold text-gray-700">10m</button>
+      <button onclick="setTimerPreset(1800)" class="flex-1 py-1 bg-white hover:bg-teal-50 border border-gray-300 rounded font-mono text-[11px] font-bold text-gray-700">30m</button>
+    </div>
+
+    <!-- 操作ボタン -->
+    <div class="flex space-x-2 mt-1">
+      <button id="btn-timer-start" onclick="toggleTimer()"
+        class="flex-1 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold text-sm shadow-sm transition-colors">
+        ▶ Start
+      </button>
+      <button id="btn-timer-reset" onclick="resetTimer()"
+        class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-bold text-xs border border-gray-300 transition-colors">
+        Reset
+      </button>
+    </div>
+
+    <!-- アラーム音切替 ＆ ログ挿入 -->
+    <div class="flex items-center justify-between pt-2 mt-2 border-t border-gray-300">
+      <label class="flex items-center space-x-1 text-gray-600 cursor-pointer">
+        <input id="chk-sound" type="checkbox" checked onchange="saveConfig()" class="rounded border-gray-400">
+        <span id="lbl-sound">🔔 終了音</span>
+      </label>
+      <button id="btn-insert-timer" onclick="insertTimerLogToEditor()"
+        class="px-3 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded font-bold shadow-2xs transition-colors">
+        📝 ログへ挿入
+      </button>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- 2. ストップウォッチ画面                       -->
+  <!-- ========================================== -->
+  <div id="view-stopwatch" class="hidden flex-1 flex flex-col justify-between overflow-hidden">
+    <!-- メモ/ラベル入力 -->
+    <div class="flex items-center space-x-1.5">
+      <span id="lbl-sw-label" class="text-gray-500 font-bold whitespace-nowrap">内容:</span>
+      <input id="sw-label" type="text" placeholder="例: スキャン所要時間 / 反応時間"
+        class="flex-1 border border-gray-300 bg-white rounded px-2 py-1 text-xs outline-none focus:border-teal-500">
+    </div>
+
+    <!-- デジタル計測表示 -->
+    <div class="my-2 py-3 bg-white border border-gray-300 rounded-xl shadow-inner flex flex-col items-center justify-center">
+      <div id="sw-display" class="font-mono text-3xl font-extrabold tracking-wider text-slate-800">00:00.00</div>
+      <div id="sw-lap-current" class="text-[10px] text-teal-600 font-mono mt-0.5">LAP 00:00.00</div>
+    </div>
+
+    <!-- 操作ボタン -->
+    <div class="flex space-x-1.5 mb-2">
+      <button id="btn-sw-start" onclick="toggleStopwatch()"
+        class="flex-1 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold text-xs shadow-sm transition-colors">
+        ▶ Start
+      </button>
+      <button id="btn-sw-lap" onclick="recordLap()" disabled
+        class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-lg font-bold text-xs shadow-sm transition-colors">
+        Lap
+      </button>
+      <button id="btn-sw-reset" onclick="resetStopwatch()"
+        class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-bold text-xs border border-gray-300 transition-colors">
+        Reset
+      </button>
+    </div>
+
+    <!-- ラップ一覧 -->
+    <div class="flex-1 overflow-y-auto bg-white border border-gray-300 rounded p-1.5 font-mono text-[11px] select-text">
+      <table class="w-full text-left border-collapse">
+        <thead class="border-b border-gray-200 text-gray-400 text-[10px]">
+          <tr>
+            <th class="py-0.5 px-1">#</th>
+            <th class="py-0.5 px-1">Lap</th>
+            <th class="py-0.5 px-1 text-right">Split</th>
+          </tr>
+        </thead>
+        <tbody id="sw-lap-list" class="divide-y divide-gray-100"></tbody>
+      </table>
+    </div>
+
+    <!-- ログ挿入フッター -->
+    <div class="flex justify-end pt-2 mt-2 border-t border-gray-300">
+      <button id="btn-insert-sw" onclick="insertStopwatchLogToEditor()"
+        class="px-3 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded font-bold shadow-2xs transition-colors">
+        📝 計測結果をログへ挿入
+      </button>
+    </div>
+  </div>
+
+  <script>
+    const bridgeChannel = new BroadcastChannel('ain_addin_bridge');
+    const i18nChannel = new BroadcastChannel('ain_i18n_channel');
+
+    const i18nDict = {
+      ja: {
+        winTitle: "AIN - タイマー / ストップウォッチ",
+        tabTimer: "⏳ タイマー",
+        tabSw: "⏱️ ストップウォッチ",
+        label: "内容:",
+        phTimer: "例: 露光時間 / 試料アニール",
+        phSw: "例: スキャン所要時間 / 反応時間",
+        sound: "🔔 終了音",
+        insertTimer: "📝 ログへ挿入",
+        insertSw: "📝 計測結果をログへ挿入",
+        timeUp: "⏰ 時間になりました！"
+      },
+      en: {
+        winTitle: "AIN - Timer / Stopwatch",
+        tabTimer: "⏳ Timer",
+        tabSw: "⏱️ Stopwatch",
+        label: "Label:",
+        phTimer: "e.g. Exposure / Annealing",
+        phSw: "e.g. Scan duration",
+        sound: "🔔 Alarm",
+        insertTimer: "📝 Insert to Log",
+        insertSw: "📝 Insert Result to Log",
+        timeUp: "⏰ Time is up!"
+      }
+    };
+
+    let currentLang = 'ja';
+
+    function applyLang(lang) {
+      currentLang = (lang === 'en') ? 'en' : 'ja';
+      const d = i18nDict[currentLang];
+
+      document.getElementById('tab-timer').textContent = d.tabTimer;
+      document.getElementById('tab-sw').textContent = d.tabSw;
+      document.getElementById('lbl-t-label').textContent = d.label;
+      document.getElementById('lbl-sw-label').textContent = d.label;
+      document.getElementById('timer-label').placeholder = d.phTimer;
+      document.getElementById('sw-label').placeholder = d.phSw;
+      document.getElementById('lbl-sound').textContent = d.sound;
+      document.getElementById('btn-insert-timer').textContent = d.insertTimer;
+      document.getElementById('btn-insert-sw').textContent = d.insertSw;
+
+      document.title = d.winTitle;
+      fetch('/api/set_window_title', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ win_key: 'window_addin_05_timer', title: d.winTitle })
+      }).catch(() => {});
+    }
+
+    function switchMode(mode) {
+      const isTimer = (mode === 'timer');
+      document.getElementById('view-timer').classList.toggle('hidden', !isTimer);
+      document.getElementById('view-stopwatch').classList.toggle('hidden', isTimer);
+
+      const tBtn = document.getElementById('tab-timer');
+      const sBtn = document.getElementById('tab-sw');
+      if (isTimer) {
+        tBtn.className = "flex-1 py-1.5 font-bold rounded-t bg-teal-600 text-white shadow-2xs transition-colors";
+        sBtn.className = "flex-1 py-1.5 font-bold rounded-t bg-gray-200 text-gray-600 hover:bg-gray-300 transition-colors";
+      } else {
+        sBtn.className = "flex-1 py-1.5 font-bold rounded-t bg-teal-600 text-white shadow-2xs transition-colors";
+        tBtn.className = "flex-1 py-1.5 font-bold rounded-t bg-gray-200 text-gray-600 hover:bg-gray-300 transition-colors";
+      }
+    }
+
+    // ==========================================
+    // Web Audio API 電子アラーム音（外部ファイル不要）
+    // ==========================================
+    function playBeepAlarm() {
+      if (!document.getElementById('chk-sound').checked) return;
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const now = ctx.currentTime;
+        // ピピピッ × 2回
+        [0, 0.14, 0.28, 0.65, 0.79, 0.93].forEach(offset => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(880, now + offset);
+          gain.gain.setValueAtTime(0.18, now + offset);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.1);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + offset);
+          osc.stop(now + offset + 0.11);
+        });
+      } catch (e) {
+        console.warn("Audio play failed:", e);
+      }
+    }
+
+    // ==========================================
+    // カウントダウンタイマー ロジック (Date.now() ベースで高精度維持)
+    // ==========================================
+    let timerTotalSec = 300;
+    let timerRemainingMs = 300 * 1000;
+    let timerEndEpoch = null;
+    let timerInterval = null;
+
+    function formatTimerMs(ms) {
+      const totalSec = Math.max(0, Math.ceil(ms / 1000));
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+      if (h > 0) {
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+      }
+      return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    function syncInputsFromSeconds(sec) {
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = sec % 60;
+      document.getElementById('inp-h').value = h;
+      document.getElementById('inp-m').value = m;
+      document.getElementById('inp-s').value = s;
+    }
+
+    function applyManualInputs() {
+      if (timerInterval) return;
+      const h = Math.max(0, parseInt(document.getElementById('inp-h').value, 10) || 0);
+      const m = Math.max(0, Math.min(59, parseInt(document.getElementById('inp-m').value, 10) || 0));
+      const s = Math.max(0, Math.min(59, parseInt(document.getElementById('inp-s').value, 10) || 0));
+      timerTotalSec = Math.max(1, h * 3600 + m * 60 + s);
+      timerRemainingMs = timerTotalSec * 1000;
+      updateTimerUI("READY", false);
+      saveConfig();
+    }
+
+    function setTimerPreset(sec) {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+      timerTotalSec = sec;
+      timerRemainingMs = sec * 1000;
+      syncInputsFromSeconds(sec);
+      document.getElementById('btn-timer-start').textContent = "▶ Start";
+      document.getElementById('btn-timer-start').classList.replace('bg-amber-600', 'bg-teal-600');
+      updateTimerUI("READY", false);
+      saveConfig();
+    }
+
+    function updateTimerUI(subText, isAlert) {
+      const disp = document.getElementById('timer-display');
+      const box = document.getElementById('timer-display-box');
+      const sub = document.getElementById('timer-sub');
+      disp.textContent = formatTimerMs(timerRemainingMs);
+      sub.textContent = subText;
+
+      if (isAlert) {
+        box.classList.add('bg-rose-50', 'border-rose-400');
+        disp.classList.replace('text-teal-800', 'text-rose-600');
+      } else {
+        box.classList.remove('bg-rose-50', 'border-rose-400');
+        disp.classList.replace('text-rose-600', 'text-teal-800');
+      }
+    }
+
+    function toggleTimer() {
+      const btn = document.getElementById('btn-timer-start');
+      if (timerInterval) {
+        // 一時停止
+        clearInterval(timerInterval);
+        timerInterval = null;
+        timerRemainingMs = Math.max(0, timerEndEpoch - Date.now());
+        btn.textContent = "▶ Resume";
+        btn.classList.replace('bg-amber-600', 'bg-teal-600');
+        updateTimerUI("PAUSED", false);
+      } else {
+        // 開始
+        if (timerRemainingMs <= 0) {
+          timerRemainingMs = timerTotalSec * 1000;
+        }
+        timerEndEpoch = Date.now() + timerRemainingMs;
+        btn.textContent = "⏸ Pause";
+        btn.classList.replace('bg-teal-600', 'bg-amber-600');
+        updateTimerUI("RUNNING", false);
+
+        timerInterval = setInterval(() => {
+          const left = timerEndEpoch - Date.now();
+          if (left <= 0) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+            timerRemainingMs = 0;
+            btn.textContent = "▶ Start";
+            btn.classList.replace('bg-amber-600', 'bg-teal-600');
+            updateTimerUI(i18nDict[currentLang].timeUp, true);
+            playBeepAlarm();
+          } else {
+            timerRemainingMs = left;
+            updateTimerUI("RUNNING", false);
+          }
+        }, 100);
+      }
+    }
+
+    function resetTimer() {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+      timerRemainingMs = timerTotalSec * 1000;
+      const btn = document.getElementById('btn-timer-start');
+      btn.textContent = "▶ Start";
+      btn.classList.replace('bg-amber-600', 'bg-teal-600');
+      updateTimerUI("READY", false);
+    }
+
+    // ==========================================
+    // ストップウォッチ ロジック (performance.now() 高精度計測)
+    // ==========================================
+    let swRunning = false;
+    let swStartPerf = 0;
+    let swAccumulatedMs = 0;
+    let swLastLapTotalMs = 0;
+    let swRafId = null;
+    let swLaps = [];
+
+    function formatSwMs(ms) {
+      const totalCentis = Math.floor(ms / 10);
+      const cs = totalCentis % 100;
+      const totalSec = Math.floor(totalCentis / 100);
+      const s = totalSec % 60;
+      const m = Math.floor(totalSec / 60) % 60;
+      const h = Math.floor(totalSec / 3600);
+
+      const base = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;
+      return h > 0 ? `${String(h).padStart(2, '0')}:${base}` : base;
+    }
+
+    function updateSwLoop() {
+      if (!swRunning) return;
+      const elapsed = swAccumulatedMs + (performance.now() - swStartPerf);
+      const currentLap = elapsed - swLastLapTotalMs;
+      document.getElementById('sw-display').textContent = formatSwMs(elapsed);
+      document.getElementById('sw-lap-current').textContent = `LAP ${formatSwMs(currentLap)}`;
+      swRafId = requestAnimationFrame(updateSwLoop);
+    }
+
+    function toggleStopwatch() {
+      const btn = document.getElementById('btn-sw-start');
+      const lapBtn = document.getElementById('btn-sw-lap');
+
+      if (swRunning) {
+        swRunning = false;
+        cancelAnimationFrame(swRafId);
+        swAccumulatedMs += (performance.now() - swStartPerf);
+        btn.textContent = "▶ Resume";
+        btn.classList.replace('bg-amber-600', 'bg-teal-600');
+        lapBtn.disabled = true;
+      } else {
+        swRunning = true;
+        swStartPerf = performance.now();
+        btn.textContent = "⏸ Stop";
+        btn.classList.replace('bg-teal-600', 'bg-amber-600');
+        lapBtn.disabled = false;
+        updateSwLoop();
+      }
+    }
+
+    function recordLap() {
+      if (!swRunning) return;
+      const totalMs = swAccumulatedMs + (performance.now() - swStartPerf);
+      const lapMs = totalMs - swLastLapTotalMs;
+      swLastLapTotalMs = totalMs;
+
+      const idx = swLaps.length + 1;
+      swLaps.unshift({ idx, lapStr: formatSwMs(lapMs), splitStr: formatSwMs(totalMs) });
+      renderLapTable();
+    }
+
+    function renderLapTable() {
+      const tbody = document.getElementById('sw-lap-list');
+      tbody.innerHTML = '';
+      swLaps.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="py-0.5 px-1 text-gray-500">#${item.idx}</td>
+          <td class="py-0.5 px-1 font-bold text-teal-700">${item.lapStr}</td>
+          <td class="py-0.5 px-1 text-right text-gray-700">${item.splitStr}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function resetStopwatch() {
+      swRunning = false;
+      cancelAnimationFrame(swRafId);
+      swAccumulatedMs = 0;
+      swLastLapTotalMs = 0;
+      swLaps = [];
+      document.getElementById('sw-display').textContent = "00:00.00";
+      document.getElementById('sw-lap-current').textContent = "LAP 00:00.00";
+      const btn = document.getElementById('btn-sw-start');
+      btn.textContent = "▶ Start";
+      btn.classList.replace('bg-amber-600', 'bg-teal-600');
+      document.getElementById('btn-sw-lap').disabled = true;
+      renderLapTable();
+    }
+
+    // ==========================================
+    // AIN2 エディタへのログ挿入 (ain_addin_bridge)
+    // ==========================================
+    function getNowTimeStamp() {
+      const now = new Date();
+      return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+    }
+
+    function escapeHtml(str) {
+      return (str || '').replace(/[&<>"']/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[m]));
+    }
+
+    function insertTimerLogToEditor() {
+      const label = document.getElementById('timer-label').value.trim();
+      const setStr = formatTimerMs(timerTotalSec * 1000);
+      const elapsedSec = Math.max(0, Math.round((timerTotalSec * 1000 - timerRemainingMs) / 1000));
+      const elapsedStr = formatTimerMs(elapsedSec * 1000);
+      const titlePart = label ? ` (${escapeHtml(label)})` : "";
+
+      const html = `
+        <div class="box-wrapper" style="border-left: 4px solid #0d9488; background-color: #f0fdfa; padding: 6px 10px; margin: 6px 0; font-family: monospace; font-size: 12px; color: #134e4a; border-radius: 2px;">
+          <b>⏳ Timer [${getNowTimeStamp()}]${titlePart}</b> : Set <b>${setStr}</b> / Elapsed <b>${elapsedStr}</b>
+        </div>
+        <div><br></div>
+      `;
+      bridgeChannel.postMessage({ action: 'insert_html', html });
+    }
+
+    function insertStopwatchLogToEditor() {
+      const label = document.getElementById('sw-label').value.trim();
+      const currentTotalMs = swRunning
+        ? swAccumulatedMs + (performance.now() - swStartPerf)
+        : swAccumulatedMs;
+      const totalStr = formatSwMs(currentTotalMs);
+      const titlePart = label ? ` (${escapeHtml(label)})` : "";
+
+      let lapRowsHtml = "";
+      if (swLaps.length > 0) {
+        const ordered = [...swLaps].reverse();
+        const lines = ordered.map(l => `  #${l.idx}  Lap: ${l.lapStr}  (Split: ${l.splitStr})`).join("<br>");
+        lapRowsHtml = `<div style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed #99f6e4; font-size: 11px;">${lines}</div>`;
+      }
+
+      const html = `
+        <div class="box-wrapper" style="border-left: 4px solid #0284c7; background-color: #f0f9ff; padding: 6px 10px; margin: 6px 0; font-family: monospace; font-size: 12px; color: #0c4a6e; border-radius: 2px;">
+          <b>⏱️ Stopwatch [${getNowTimeStamp()}]${titlePart}</b> : Total <b>${totalStr}</b>
+          ${lapRowsHtml}
+        </div>
+        <div><br></div>
+      `;
+      bridgeChannel.postMessage({ action: 'insert_html', html });
+    }
+
+    // ==========================================
+    // 設定保存 ＆ 初期化
+    // ==========================================
+    function saveConfig() {
+      fetch('/api/addin/05_timer/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          presets: [60, 180, 300, 600, 1800],
+          last_seconds: timerTotalSec,
+          sound_enabled: document.getElementById('chk-sound').checked
+        })
+      }).catch(() => {});
+    }
+
+    i18nChannel.onmessage = (e) => {
+      if (e.data && e.data.action === 'change_lang') {
+        applyLang(e.data.lang || e.data.language);
+      }
+    };
+
+    Promise.all([
+      fetch('/api/config').then(r => r.json()).catch(() => ({})),
+      fetch('/api/addin/05_timer/config').then(r => r.json()).catch(() => ({}))
+    ]).then(([appCfg, timerCfg]) => {
+      applyLang(appCfg.language || 'ja');
+      if (timerCfg.last_seconds) {
+        timerTotalSec = timerCfg.last_seconds;
+        timerRemainingMs = timerTotalSec * 1000;
+        syncInputsFromSeconds(timerTotalSec);
+        updateTimerUI("READY", false);
+      }
+      if (typeof timerCfg.sound_enabled === 'boolean') {
+        document.getElementById('chk-sound').checked = timerCfg.sound_enabled;
+      }
+    });
+  </script>
+</body>
+</html>

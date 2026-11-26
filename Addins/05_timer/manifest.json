@@ -1,0 +1,14 @@
+{
+  "id": "timer",
+  "name": "タイマー / ストップウォッチ",
+  "name_en": "Timer / Stopwatch",
+  "tooltip_ja": "タイマー & ストップウォッチ（ログ挿入対応）",
+  "tooltip_en": "Timer & Stopwatch (Insert Log)",
+  "icon_svg": "<svg class=\"w-5 h-5\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><circle cx=\"12\" cy=\"13\" r=\"8\" stroke=\"#0d9488\" stroke-width=\"2\" fill=\"#f0fdfa\"/><path d=\"M12 9V13L14.5 15.5\" stroke=\"#0f766e\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M9.5 2.5H14.5\" stroke=\"#0d9488\" stroke-width=\"2\" stroke-linecap=\"round\"/><path d=\"M12 2.5V5\" stroke=\"#0d9488\" stroke-width=\"2\" stroke-linecap=\"round\"/><path d=\"M18.5 6.5L17 8\" stroke=\"#0d9488\" stroke-width=\"2\" stroke-linecap=\"round\"/></svg>",
+  "window": {
+    "type": "subwindow",
+    "entry": "window.html",
+    "width": 340,
+    "height": 440
+  }
+}
