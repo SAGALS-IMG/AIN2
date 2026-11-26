@@ -110,3 +110,15 @@ Developed by **Akio Yoneyama** (SAGA-LS).
   - Replaced the generic user icon with a color-coded initial badge for quick profile identification (アカウント頭文字と自動配色によるアバターバッジを導入).
 - **Documentation / マニュアル更新**:
   - Updated JP/EN manuals to Version 2.3.1 (日英マニュアルを v2.3.1 に更新).
+
+## v2.4.0 (2026-11-26)
+* **Timer / Stopwatch Add-in (`05_timer`) / タイマー・ストップウォッチアドインの追加:**
+  * Added a modular countdown timer and high-precision stopwatch with lap recording and one-click notebook insertion（プリセット・アラーム音付きタイマーとラップ計測対応ストップウォッチ、ノートへのワンクリック結果挿入機能を追加）。
+* **Font Size Control / フォントサイズ指定機能:**
+  * Added a toolbar font size selector (8–36 pt) with clean inline span handling and cursor synchronization（8〜36 pt のフォントサイズ変更プルダウンとネスト防止・カーソル連動を追加）。
+* **Unified Undo / Redo History / エディタ Undo・Redo の統一:**
+  * Implemented a snapshot history stack (`Cmd+Z` / `Cmd+Shift+Z` / `Ctrl+Y`) for consistent text and add-in edit history（テキスト編集・アドイン挿入を統一的に戻せるスナップショット履歴スタックを実装）。
+* **Full Offline Support & Window Bounds Clamping / 完全オフライン対応・画面外補正:**
+  * Bundled Tailwind CSS locally across all core and add-in views, and added multi-display boundary clamping on startup（全画面・全アドインの Tailwind CSS ローカル同梱化と、マルチディスプレイ解除時の画面外はみ出し補正を適用）。
+* **Documentation / マニュアル更新:**
+  * Updated JP/EN manuals to Version 2.4.0（日英マニュアルを v2.4.0 に更新）。
