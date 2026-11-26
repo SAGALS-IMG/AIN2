@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>AIN - Telegram現場連携</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/static/js/tailwindcss.js"></script>
 </head>
 <body class="h-screen flex flex-col bg-slate-50 text-gray-800 text-xs font-sans select-none overflow-hidden">
 
@@ -47,13 +47,13 @@
       <div class="space-y-3 flex-1 overflow-y-auto">
         <div>
           <label id="lbl-cfg-token" class="block font-bold text-gray-700 mb-1">Bot Token</label>
-          <input id="input_bot_token" type="password" placeholder="55555555555" class="w-full border border-gray-300 p-2 rounded text-xs font-mono outline-none focus:border-sky-500">
+          <input id="input_bot_token" type="password" placeholder="7123456789:AAFnX..." class="w-full border border-gray-300 p-2 rounded text-xs font-mono outline-none focus:border-sky-500">
           <span id="lbl-cfg-token-hint" class="text-[10px] text-gray-400 mt-0.5 block">@BotFather から取得したトークン</span>
         </div>
 
         <div>
           <label id="lbl-cfg-users" class="block font-bold text-gray-700 mb-1">Allowed User IDs (カンマ区切り)</label>
-          <input id="input_allowed_ids" type="text" placeholder="12345678, 000000000" class="w-full border border-gray-300 p-2 rounded text-xs font-mono outline-none focus:border-sky-500">
+          <input id="input_allowed_ids" type="text" placeholder="320728799, 987654321" class="w-full border border-gray-300 p-2 rounded text-xs font-mono outline-none focus:border-sky-500">
           <span id="lbl-cfg-users-hint" class="text-[10px] text-gray-400 mt-0.5 block">@userinfobot で確認した数値ID</span>
         </div>
       </div>
