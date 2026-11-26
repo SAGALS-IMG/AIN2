@@ -2,6 +2,8 @@ import os
 import glob
 import re
 import shutil
+import threading
+
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -9,6 +11,19 @@ from pydantic import BaseModel
 from core.config import AccountPaths
 
 router = APIRouter(prefix="/api", tags=["logs"])
+
+def _atomic_write_text(path: Path, text: str):
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(text)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except Exception:
+        if tmp.exists():
+            tmp.unlink()
+        raise
 
 # ==========================================
 # ログモデル定義
@@ -87,14 +102,10 @@ def save_log(payload: LogPayload):
     try:
         # 既存ログが存在する場合は .bak にリネーム退避
         if file_path.exists():
-            if bak_path.exists():
-                bak_path.unlink()
-            file_path.rename(bak_path)
+            shutil.copy2(file_path, bak_path)
 
         # アトミック書き込みで確定HTMLを保存
-        atomic_tmp = file_path.with_suffix(f".atomic.{os.getpid()}")
-        atomic_tmp.write_text(full_html, encoding="utf-8")
-        atomic_tmp.replace(file_path)
+        _atomic_write_text(file_path, full_html)
 
         # 確定保存が完了したので一時下書き(.tmp)を削除
         if draft_tmp_path.exists():
@@ -117,9 +128,7 @@ def save_tmp_log(payload: LogPayload):
     draft_tmp_path = paths.log_dir / f"{payload.date_str}.tmp"
 
     try:
-        atomic_tmp = draft_tmp_path.with_suffix(f".atomic.{os.getpid()}")
-        atomic_tmp.write_text(payload.content_html, encoding="utf-8")
-        atomic_tmp.replace(draft_tmp_path)
+        _atomic_write_text(draft_tmp_path, payload.content_html)
         return {
             "status": "ok",
             "mtime": draft_tmp_path.stat().st_mtime
@@ -303,7 +312,7 @@ def save_memo(payload: MemoPayload):
         except Exception as e:
             print(f"[Memo bak warning] {e}")
 
-    memo_file.write_text(payload.content_html, encoding="utf-8")
+    _atomic_write_text(memo_file, payload.content_html)
     return {
         "status": "ok",
         "account": paths.account,
