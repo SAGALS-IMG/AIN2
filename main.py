@@ -6,6 +6,8 @@ import shutil
 import hashlib
 from pathlib import Path
 import subprocess
+import socket
+import ipaddress
 
 import uvicorn
 from fastapi import FastAPI
@@ -33,7 +35,7 @@ from core.config import (
 from core.addin_loader import init_addins
 from routers import logs, tools, imagej
 
-app = FastAPI(title="AILab_Note (AIN2)", version="2.3.1")
+app = FastAPI(title="AILab_Note (AIN2)", version="2.4.0")
 
 # CORS設定
 app.add_middleware(
@@ -166,6 +168,43 @@ def _save_geometry(win_key: str, window):
     except Exception as e:
         print(f"[Geometry Error] {win_key}: {e}")
 
+def _clamp_window_geometry(x, y, w, h, default_w, default_h):
+    """マルチディスプレイ解除などで画面外に飛んだ座標を現在の画面領域内に収める"""
+    w = int(w) if w else int(default_w)
+    h = int(h) if h else int(default_h)
+    if x is None or y is None:
+        return None, None, w, h
+
+    x = int(x)
+    y = int(y)
+
+    if sys.platform == "darwin":
+        try:
+            from AppKit import NSScreen
+            screens = NSScreen.screens() or []
+            if screens:
+                # pywebview の座標系に合わせて各スクリーンの枠を確認
+                # どれかのスクリーンの矩形と重なっていればそのまま採用
+                for sc in screens:
+                    f = sc.visibleFrame()
+                    sx, sy, sw, sh = f.origin.x, f.origin.y, f.size.width, f.size.height
+                    # ウィンドウの少なくとも一部（100px四方以上）が画面内にあるか判定
+                    overlaps_x = (x + min(w, 100) > sx) and (x < sx + sw - 50)
+                    overlaps_y = (y + min(h, 100) > sy) and (y < sy + sh - 50)
+                    if overlaps_x and overlaps_y:
+                        return x, y, w, h
+
+                # どの画面からも外れている場合はメイン画面の左上付近へ戻す
+                main_f = screens[0].visibleFrame()
+                safe_w = min(w, int(main_f.size.width))
+                safe_h = min(h, int(main_f.size.height))
+                safe_x = int(main_f.origin.x) + 40
+                safe_y = int(main_f.origin.y) + 40
+                return safe_x, safe_y, safe_w, safe_h
+        except Exception:
+            pass
+
+    return x, y, w, h
 
 def create_sub_window(win_key: str, title: str, path: str, default_w: int, default_h: int):
     global sub_windows
@@ -183,10 +222,15 @@ def create_sub_window(win_key: str, title: str, path: str, default_w: int, defau
 
     try:
         geom = load_geometry().get(win_key, {})
-        init_x = geom.get("x")
-        init_y = geom.get("y")
-        init_w = geom.get("width", default_w)
-        init_h = geom.get("height", default_h)
+        init_x, init_y, init_w, init_h = _clamp_window_geometry(
+            geom.get("x"),
+            geom.get("y"),
+            geom.get("width", default_w),
+            geom.get("height", default_h),
+            default_w,
+            default_h,
+        )
+
 
         kwargs = {
             "title": title,
@@ -358,6 +402,9 @@ def api_save_config(cfg: dict):
     save_account_config(cfg, acc)
     return {"status": "ok", "config": load_account_config(acc)}
 
+@app.get("/api/version")
+def api_get_version():
+    return {"version": app.version}
 
 # ==========================================
 # 終了処理 ＆ 差分バックアップ（ログ OR マージ対応）
@@ -616,8 +663,42 @@ def on_main_closed():
 # ==========================================
 # 起動エントリーポイント
 # ==========================================
+def _get_tailscale_ip():
+    """Tailscale の自IP (100.64.0.0/10) を取得。未接続なら None"""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(("100.100.100.100", 80))
+            ip = s.getsockname()[0]
+        finally:
+            s.close()
+        if ipaddress.ip_address(ip) in ipaddress.ip_network("100.64.0.0/10"):
+            return ip
+    except Exception:
+        pass
+    return None
+
+
 def start_server():
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="warning")
+    hosts = ["127.0.0.1"]
+    ts_ip = _get_tailscale_ip()
+    if ts_ip:
+        hosts.append(ts_ip)
+
+    sockets = []
+    for h in hosts:
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            if sys.platform != "win32":
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.bind((h, 8000))
+            sockets.append(sock)
+        except OSError as e:
+            print(f"[AIN] Bind failed {h}:8000: {e}")
+    print(f"[AIN] Listening on: {', '.join(f'http://{s.getsockname()[0]}:8000' for s in sockets)}")
+
+    config = uvicorn.Config(app, port=8000, log_level="warning")
+    uvicorn.Server(config).run(sockets=sockets)
 
 
 if __name__ == "__main__":
@@ -627,10 +708,14 @@ if __name__ == "__main__":
 
     if webview is not None:
         geom = load_geometry().get("window_main", {})
-        init_x = geom.get("x")
-        init_y = geom.get("y")
-        init_w = geom.get("width", 1150)
-        init_h = geom.get("height", 850)
+        init_x, init_y, init_w, init_h = _clamp_window_geometry(
+            geom.get("x"),
+            geom.get("y"),
+            geom.get("width", 1150),
+            geom.get("height", 850),
+            1150,
+            850,
+        )
 
         main_kwargs = {
             "title": "AIN - AILab Note",
@@ -639,6 +724,7 @@ if __name__ == "__main__":
             "height": init_h,
             "resizable": True
         }
+
         if init_x is not None and init_y is not None:
             main_kwargs["x"] = init_x
             main_kwargs["y"] = init_y
